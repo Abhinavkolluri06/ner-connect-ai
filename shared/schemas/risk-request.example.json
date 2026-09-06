@@ -1,0 +1,8 @@
+{
+  "route_id": "route-a",
+  "rainfall": 82,
+  "slope": 64,
+  "elevation": 1300,
+  "historical_landslides": 7,
+  "road_condition": 55
+}

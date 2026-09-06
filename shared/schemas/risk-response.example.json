@@ -1,0 +1,8 @@
+{
+  "route_id": "route-a",
+  "landslide_risk": 76,
+  "flood_risk": 21,
+  "weather_risk": 68,
+  "accessibility_score": 84,
+  "confidence": 91
+}
