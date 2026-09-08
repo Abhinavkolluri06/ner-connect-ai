@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "Segment": {
+      "additionalProperties": false,
+      "properties": {
+        "latitude": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Latitude",
+          "type": "number"
+        },
+        "longitude": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Longitude",
+          "type": "number"
+        },
+        "rainfall_mm": {
+          "minimum": 0,
+          "title": "Rainfall Mm",
+          "type": "number"
+        },
+        "slope_deg": {
+          "maximum": 90,
+          "minimum": 0,
+          "title": "Slope Deg",
+          "type": "number"
+        },
+        "elevation_m": {
+          "title": "Elevation M",
+          "type": "number"
+        },
+        "historical_landslides": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "title": "Historical Landslides",
+          "type": "integer"
+        },
+        "road_condition_score": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Road Condition Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "latitude",
+        "longitude",
+        "rainfall_mm",
+        "slope_deg",
+        "elevation_m",
+        "historical_landslides",
+        "road_condition_score"
+      ],
+      "title": "Segment",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "route_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Route Id",
+      "type": "string"
+    },
+    "segments": {
+      "items": {
+        "$ref": "#/$defs/Segment"
+      },
+      "maxItems": 1000,
+      "minItems": 1,
+      "title": "Segments",
+      "type": "array"
+    }
+  },
+  "required": [
+    "route_id",
+    "segments"
+  ],
+  "title": "RiskRequest",
+  "type": "object"
+}

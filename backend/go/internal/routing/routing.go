@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/ner-connect-ai/backend-go/internal/models"
@@ -25,11 +24,16 @@ func (DemoProvider) Routes(_ context.Context, req models.AnalyzeRequest) ([]mode
 	if !strings.EqualFold(req.Origin, "Guwahati") || !strings.EqualFold(req.Destination, "Shillong") {
 		return nil, fmt.Errorf("demo route not found")
 	}
-	return []models.RouteCandidate{
+	candidates := []models.RouteCandidate{
 		{RouteID: "route-a", DistanceKM: 99.4, ETAMinutes: 176, Reliability: .55, Geometry: "demo:a", Segments: []models.Segment{{Latitude: 25.57, Longitude: 91.88, SlopeDeg: 38, ElevationM: 1450, HistoricalLandslides: 9, RoadConditionScore: 52}}},
 		{RouteID: "route-b", DistanceKM: 103.2, ETAMinutes: 188, Reliability: .92, Geometry: "demo:b", Segments: []models.Segment{{Latitude: 25.55, Longitude: 91.82, SlopeDeg: 12, ElevationM: 1200, HistoricalLandslides: 1, RoadConditionScore: 88}}},
 		{RouteID: "route-c", DistanceKM: 116.8, ETAMinutes: 211, Reliability: .72, Geometry: "demo:c", Segments: []models.Segment{{Latitude: 25.48, Longitude: 91.75, SlopeDeg: 24, ElevationM: 1320, HistoricalLandslides: 4, RoadConditionScore: 70}}},
-	}, nil
+	}
+	for i := range candidates {
+		candidates[i].Data = models.DataQuality{RoutingSource: "demo", WeatherSource: "demo", TerrainSource: "demo", HistorySource: "synthetic demo", RoadSource: "synthetic demo", FeatureCoverage: 1, MissingFeatures: []string{}, Warnings: []string{"Synthetic demonstration route and features; not navigation data. No real map geometry is available in offline demo mode."}}
+		candidates[i].VehicleSuitability = "demo_not_verified"
+	}
+	return candidates, nil
 }
 
 type MockProvider struct {
@@ -94,5 +98,3 @@ func (p LiveProvider) Routes(ctx context.Context, in models.AnalyzeRequest) ([]m
 	}
 	return out, nil
 }
-
-var _ = url.QueryEscape

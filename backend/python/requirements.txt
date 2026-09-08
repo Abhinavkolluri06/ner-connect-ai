@@ -1,0 +1,5 @@
+# Verified runtime, Python 3.11+ (tested on 3.14).
+fastapi==0.141.1
+pydantic==2.13.5
+uvicorn==0.52.4
+starlette==1.6.0

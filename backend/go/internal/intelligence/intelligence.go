@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/ner-connect-ai/backend-go/internal/models"
@@ -47,22 +48,37 @@ func (c HTTPClient) AnalyzeRisk(ctx context.Context, in models.RiskRequest) (mod
 		limit = 1 << 20
 	}
 	var payloadOut struct {
-		RouteID            *string  `json:"route_id"`
-		LandslideRisk      *float64 `json:"landslide_risk"`
-		FloodRisk          *float64 `json:"flood_risk"`
-		WeatherRisk        *float64 `json:"weather_risk"`
-		AccessibilityScore *float64 `json:"accessibility_score"`
-		Confidence         *float64 `json:"confidence"`
+		RouteID            *string         `json:"route_id"`
+		LandslideRisk      *float64        `json:"landslide_risk"`
+		FloodRisk          *float64        `json:"flood_risk"`
+		WeatherRisk        *float64        `json:"weather_risk"`
+		AccessibilityScore *float64        `json:"accessibility_score"`
+		Confidence         *float64        `json:"confidence"`
+		ModelMode          json.RawMessage `json:"model_mode"`
 	}
-	dec := json.NewDecoder(io.LimitReader(resp.Body, limit))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil || int64(len(raw)) > limit {
+		return models.RiskResponse{}, fmt.Errorf("intelligence response exceeds limit or cannot be read")
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&payloadOut); err != nil {
 		return models.RiskResponse{}, fmt.Errorf("decode intelligence response: %w", err)
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		return models.RiskResponse{}, fmt.Errorf("intelligence response contains extra JSON")
 	}
 	if payloadOut.RouteID == nil || payloadOut.LandslideRisk == nil || payloadOut.FloodRisk == nil || payloadOut.WeatherRisk == nil || payloadOut.AccessibilityScore == nil || payloadOut.Confidence == nil {
 		return models.RiskResponse{}, fmt.Errorf("intelligence response missing required fields")
 	}
 	out := models.RiskResponse{RouteID: *payloadOut.RouteID, LandslideRisk: *payloadOut.LandslideRisk, FloodRisk: *payloadOut.FloodRisk, WeatherRisk: *payloadOut.WeatherRisk, AccessibilityScore: *payloadOut.AccessibilityScore, Confidence: *payloadOut.Confidence}
+	// Older services omit model_mode; a supplied value must identify the engine.
+	if len(payloadOut.ModelMode) > 0 {
+		if err := json.Unmarshal(payloadOut.ModelMode, &out.ModelMode); err != nil || (out.ModelMode != "heuristic" && out.ModelMode != "ml") {
+			return out, fmt.Errorf("invalid model_mode: must be heuristic or ml")
+		}
+	}
 	if out.RouteID != in.RouteID {
 		return out, fmt.Errorf("intelligence route ID mismatch")
 	}
@@ -105,28 +121,51 @@ func (m MockProvider) AnalyzeRisk(_ context.Context, r models.RiskRequest) (mode
 // HeuristicFallbackRiskProvider is deterministic and is not a trained ML model.
 type HeuristicFallbackRiskProvider struct{}
 
-func (HeuristicFallbackRiskProvider) AnalyzeRisk(_ context.Context, r models.RiskRequest) (models.RiskResponse, error) {
+func (HeuristicFallbackRiskProvider) AnalyzeRisk(ctx context.Context, r models.RiskRequest) (models.RiskResponse, error) {
 	if len(r.Segments) == 0 {
 		return models.RiskResponse{}, fmt.Errorf("fallback requires route segments")
 	}
-	var rain, slope, elevation, historical, road float64
-	for _, s := range r.Segments {
-		rain += clamp(s.RainfallMM / 120)
-		slope += clamp(s.SlopeDeg / 45)
-		elevation += clamp(s.ElevationM / 2500)
-		historical += clamp(float64(s.HistoricalLandslides) / 10)
-		road += clamp(s.RoadConditionScore / 100)
+	if err := ctx.Err(); err != nil {
+		return models.RiskResponse{}, err
 	}
-	n := float64(len(r.Segments))
-	rain /= n
-	slope /= n
-	elevation /= n
-	historical /= n
-	road /= n
-	landslide := clamp(.25*rain + .30*slope + .15*elevation + .20*historical + .10*(1-road))
-	flood := clamp(.65*rain + .20*(1-elevation) + .15*(1-road))
-	weather := clamp(rain)
-	return models.RiskResponse{RouteID: r.RouteID, LandslideRisk: landslide, FloodRisk: flood, WeatherRisk: weather, AccessibilityScore: clamp(.75*road + .25*(1-slope)), Confidence: .55}, nil
+	land, floods, weatherRisks, accessibility := []float64{}, []float64{}, []float64{}, []float64{}
+	for _, s := range r.Segments {
+		for _, v := range []float64{s.RainfallMM, s.SlopeDeg, s.ElevationM, s.RoadConditionScore} {
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				return models.RiskResponse{}, fmt.Errorf("non-finite segment feature")
+			}
+		}
+		if s.RainfallMM < 0 || s.SlopeDeg < 0 || s.SlopeDeg > 90 || s.HistoricalLandslides < 0 || s.RoadConditionScore < 0 || s.RoadConditionScore > 100 {
+			return models.RiskResponse{}, fmt.Errorf("invalid segment feature")
+		}
+		rain := clamp(s.RainfallMM / 120)
+		slope := clamp(s.SlopeDeg / 45)
+		elevation := clamp(s.ElevationM / 2500)
+		history := clamp(float64(s.HistoricalLandslides) / 10)
+		road := clamp(s.RoadConditionScore / 100)
+		l := clamp(.30*rain + .35*slope + .25*history + .10*(1-road))
+		f := clamp(.65*rain + .20*(1-elevation) + .15*(1-slope))
+		land = append(land, l)
+		floods = append(floods, f)
+		weatherRisks = append(weatherRisks, rain)
+		accessibility = append(accessibility, clamp(.60*road+.15*(1-slope)+.10*(1-rain)+.15*(1-math.Max(l, f))))
+	}
+	minAccess, mean := 1.0, 0.0
+	for _, a := range accessibility {
+		minAccess = math.Min(minAccess, a)
+		mean += a
+	}
+	mean /= float64(len(accessibility))
+	// Confidence is required-field completeness, NOT statistical confidence.
+	return models.RiskResponse{RouteID: r.RouteID, LandslideRisk: aggregate(land), FloodRisk: aggregate(floods), WeatherRisk: aggregate(weatherRisks), AccessibilityScore: clamp(.6*minAccess + .4*mean), Confidence: 1, ModelMode: "heuristic"}, nil
+}
+func aggregate(values []float64) float64 {
+	sort.Float64s(values)
+	position := .9 * float64(len(values)-1)
+	lo := int(position)
+	hi := int(math.Ceil(position))
+	p90 := values[lo] + (values[hi]-values[lo])*(position-float64(lo))
+	return clamp(.6*values[len(values)-1] + .4*p90)
 }
 func clamp(v float64) float64 {
 	if v < 0 {

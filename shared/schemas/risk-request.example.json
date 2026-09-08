@@ -1,8 +1,14 @@
 {
   "route_id": "route-a",
-  "rainfall": 82,
-  "slope": 64,
-  "elevation": 1300,
-  "historical_landslides": 7,
-  "road_condition": 55
+  "segments": [
+    {
+      "latitude": 25.57,
+      "longitude": 91.88,
+      "rainfall_mm": 82.0,
+      "slope_deg": 34.0,
+      "elevation_m": 1300.0,
+      "historical_landslides": 7,
+      "road_condition_score": 55.0
+    }
+  ]
 }

@@ -1,0 +1,22 @@
+[
+  {"id":"bongaigaon","name":"Bongaigaon","state":"Assam","latitude":26.47703,"longitude":90.55815,"source":"Open-Meteo / GeoNames 1275321; retrieved 2026-09-07"},
+  {"id":"guwahati","name":"Guwahati","state":"Assam","latitude":26.1844,"longitude":91.7458,"source":"Open-Meteo / GeoNames 1271476; retrieved 2026-09-07"},
+  {"id":"shillong","name":"Shillong","state":"Meghalaya","latitude":25.56892,"longitude":91.88313,"source":"Open-Meteo / GeoNames 1256523; retrieved 2026-09-07"},
+  {"id":"tura","name":"Tura","state":"Meghalaya","latitude":25.51421,"longitude":90.20239,"source":"Open-Meteo / GeoNames 1254046; retrieved 2026-09-07"},
+  {"id":"jowai","name":"Jowai","state":"Meghalaya","latitude":25.43596,"longitude":92.19132,"source":"Open-Meteo / GeoNames 1268810; retrieved 2026-09-07"},
+  {"id":"agartala","name":"Agartala","state":"Tripura","latitude":23.83605,"longitude":91.27939,"source":"Open-Meteo / GeoNames 1279290; retrieved 2026-09-07"},
+  {"id":"aizawl","name":"Aizawl","state":"Mizoram","latitude":23.72894,"longitude":92.71791,"source":"Open-Meteo / GeoNames 1279186; retrieved 2026-09-07"},
+  {"id":"imphal","name":"Imphal","state":"Manipur","latitude":24.80805,"longitude":93.9442,"source":"Open-Meteo / GeoNames 1269771; retrieved 2026-09-07"},
+  {"id":"kohima","name":"Kohima","state":"Nagaland","latitude":25.67467,"longitude":94.11099,"source":"Open-Meteo / GeoNames 1266366; retrieved 2026-09-07"},
+  {"id":"dimapur","name":"Dimapur","state":"Nagaland","latitude":25.91174,"longitude":93.7217,"source":"Open-Meteo / GeoNames 1272552; retrieved 2026-09-07; spelling normalized"},
+  {"id":"itanagar","name":"Itanagar","state":"Arunachal Pradesh","latitude":27.08694,"longitude":93.60987,"source":"Open-Meteo / GeoNames 1269655; retrieved 2026-09-07; state curated"},
+  {"id":"pasighat","name":"Pasighat","state":"Arunachal Pradesh","latitude":28.06631,"longitude":95.32678,"source":"Open-Meteo / GeoNames 1260206; retrieved 2026-09-07; state curated"},
+  {"id":"tawang","name":"Tawang","state":"Arunachal Pradesh","latitude":27.57417,"longitude":91.795,"source":"Open-Meteo / GeoNames 1254832; retrieved 2026-09-07; state curated"},
+  {"id":"gangtok","name":"Gangtok","state":"Sikkim","latitude":27.32574,"longitude":88.61216,"source":"Open-Meteo / GeoNames 1271631; retrieved 2026-09-07"},
+  {"id":"pelling","name":"Pelling","state":"Sikkim","latitude":27.30158,"longitude":88.23266,"source":"Open-Meteo / GeoNames 7114402; retrieved 2026-09-07"},
+  {"id":"silchar","name":"Silchar","state":"Assam","latitude":24.82733,"longitude":92.79787,"source":"Open-Meteo / GeoNames 1256287; retrieved 2026-09-07"},
+  {"id":"tezpur","name":"Tezpur","state":"Assam","latitude":26.63333,"longitude":92.8,"source":"Open-Meteo / GeoNames 1254710; retrieved 2026-09-07"},
+  {"id":"jorhat","name":"Jorhat","state":"Assam","latitude":26.75751,"longitude":94.20306,"source":"Open-Meteo / GeoNames 1268820; retrieved 2026-09-07"},
+  {"id":"dibrugarh","name":"Dibrugarh","state":"Assam","latitude":27.47989,"longitude":94.90837,"source":"Open-Meteo / GeoNames 1272648; retrieved 2026-09-07"},
+  {"id":"lunglei","name":"Lunglei","state":"Mizoram","latitude":22.89247,"longitude":92.74218,"source":"Open-Meteo / GeoNames 1264688; retrieved 2026-09-07"}
+]

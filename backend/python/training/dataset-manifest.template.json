@@ -1,0 +1,17 @@
+{
+  "kind": "template-not-training-data",
+  "hazard": "landslide",
+  "source": "REPLACE with actual inventory and feature source identifiers",
+  "license": "REPLACE with source licenses and access terms",
+  "coverage": "REPLACE with geographic bounds and observation dates",
+  "positive_sampling": "REPLACE with verified inventory inclusion criteria",
+  "negative_sampling": "REPLACE with observed comparable controls, exclusion buffers and detection caveats",
+  "rainfall_window": "REPLACE with a consistent accumulation window and event-time cutoff",
+  "features": {
+    "rainfall_mm": {"definition":"Accumulated rainfall before the observation cutoff","units":"mm","source":"REPLACE","missing_policy":"reject"},
+    "slope_deg": {"definition":"Terrain slope","units":"degrees","source":"REPLACE","missing_policy":"reject"},
+    "elevation_m": {"definition":"Elevation with documented vertical datum","units":"m","source":"REPLACE","missing_policy":"reject"},
+    "historical_landslides": {"definition":"Pre-observation inventory events within a documented neighbourhood","units":"count","source":"REPLACE","missing_policy":"reject"},
+    "road_condition_score": {"definition":"Road condition, higher is better","units":"0-100 index","source":"REPLACE","missing_policy":"reject"}
+  }
+}

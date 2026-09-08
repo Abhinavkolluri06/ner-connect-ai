@@ -2,9 +2,11 @@ package intelligence
 
 import (
 	"context"
+	"fmt"
 	"github.com/ner-connect-ai/backend-go/internal/models"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -24,6 +26,42 @@ func TestHTTPClientSuccess(t *testing.T) {
 	}
 	if got.AccessibilityScore != .8 {
 		t.Fatalf("unexpected response %+v", got)
+	}
+}
+func TestHTTPClientModelModeContract(t *testing.T) {
+	tests := []struct {
+		name, field, wantMode string
+		wantError             bool
+	}{
+		{name: "legacy response omits mode"},
+		{name: "heuristic", field: `,"model_mode":"heuristic"`, wantMode: "heuristic"},
+		{name: "ml", field: `,"model_mode":"ml"`, wantMode: "ml"},
+		{name: "unknown mode", field: `,"model_mode":"ai"`, wantError: true},
+		{name: "empty mode", field: `,"model_mode":""`, wantError: true},
+		{name: "null mode", field: `,"model_mode":null`, wantError: true},
+		{name: "numeric mode", field: `,"model_mode":1`, wantError: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprintf(w, `{"route_id":"r1","landslide_risk":0.2,"flood_risk":0.1,"weather_risk":0.3,"accessibility_score":0.8,"confidence":0.9%s}`, tc.field)
+			}))
+			defer server.Close()
+			got, err := (HTTPClient{BaseURL: server.URL, Client: server.Client()}).AnalyzeRisk(context.Background(), models.RiskRequest{RouteID: "r1"})
+			if tc.wantError {
+				if err == nil || !strings.Contains(err.Error(), "invalid model_mode") {
+					t.Fatalf("expected invalid model_mode error, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.ModelMode != tc.wantMode || got.RouteID != "r1" || got.LandslideRisk != .2 || got.AccessibilityScore != .8 || got.Confidence != .9 {
+				t.Fatalf("unexpected decoded response: %+v", got)
+			}
+		})
 	}
 }
 func TestHTTPClientFailures(t *testing.T) {

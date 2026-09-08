@@ -1,0 +1,44 @@
+{
+  "data_kind": "synthetic",
+  "origin": "Guwahati",
+  "destination": "Shillong",
+  "vehicle": "ambulance",
+  "cargo": "emergency_equipment",
+  "priority": "emergency",
+  "max_hazard_index": 0.8,
+  "routes": [
+    {
+      "route_id": "A",
+      "distance_km": 70,
+      "eta_minutes": 90,
+      "rainfall_mm": 110,
+      "slope_deg": 42,
+      "elevation_m": 1200,
+      "historical_landslides": 9,
+      "road_condition_score": 30
+    },
+    {
+      "route_id": "B",
+      "distance_km": 100,
+      "eta_minutes": 125,
+      "rainfall_mm": 10,
+      "slope_deg": 8,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 92,
+      "closed": true
+    },
+    {
+      "route_id": "C",
+      "distance_km": 85,
+      "eta_minutes": 110,
+      "rainfall_mm": 55,
+      "slope_deg": 25,
+      "elevation_m": 1200,
+      "historical_landslides": 3,
+      "road_condition_score": 70
+    }
+  ],
+  "scenario_id": "scenario-17",
+  "description": "Ambulance follows road closures"
+}

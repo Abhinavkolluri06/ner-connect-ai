@@ -1,0 +1,1320 @@
+{
+  "scenarios": [
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "truck",
+      "cargo": "medical_supplies",
+      "priority": "emergency",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-01",
+      "description": "Emergency medicine delivery"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "fastest",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-02",
+      "description": "Fastest with hazard filtering"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "safest",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-03",
+      "description": "Safest route"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-04",
+      "description": "Normal priority"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 0,
+          "slope_deg": 3,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 95
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 0,
+          "slope_deg": 3,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 95
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 0,
+          "slope_deg": 3,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 95
+        }
+      ],
+      "scenario_id": "scenario-05",
+      "description": "All routes dry and in good condition"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 140,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-06",
+      "description": "Heavy rain on B"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92,
+          "closed": true
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-07",
+      "description": "B closed"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92,
+          "closed": true
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70,
+          "closed": true
+        }
+      ],
+      "scenario_id": "scenario-08",
+      "description": "B and C closed; A exceeds hazard limit"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30,
+          "closed": true
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92,
+          "closed": true
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70,
+          "closed": true
+        }
+      ],
+      "scenario_id": "scenario-09",
+      "description": "All roads closed"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "truck",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92,
+          "blocked_vehicles": [
+            "truck"
+          ]
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-10",
+      "description": "Truck prohibited on B"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "motorcycle",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 36,
+          "slope_deg": 5,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 90
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 36,
+          "slope_deg": 5,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 90
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 36,
+          "slope_deg": 5,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 90
+        }
+      ],
+      "scenario_id": "scenario-11",
+      "description": "Motorcycle on wet roads"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 36,
+          "slope_deg": 5,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 90
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 36,
+          "slope_deg": 5,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 90
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 36,
+          "slope_deg": 5,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 90
+        }
+      ],
+      "scenario_id": "scenario-12",
+      "description": "Car on the same wet roads"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "food",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-13",
+      "description": "Food delivery"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "agricultural_produce",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-14",
+      "description": "Agricultural produce delivery"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "construction_materials",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-15",
+      "description": "Construction material delivery"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "passengers",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-16",
+      "description": "Passenger transport"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "ambulance",
+      "cargo": "emergency_equipment",
+      "priority": "emergency",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92,
+          "closed": true
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-17",
+      "description": "Ambulance follows road closures"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "fastest",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92,
+          "delay_minutes": 90
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-18",
+      "description": "Reported traffic delay on B"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 0,
+          "slope_deg": 2,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 99
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-19",
+      "description": "Improved road A changes the inputs"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 95,
+          "slope_deg": 40,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 25
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 0,
+          "slope_deg": 3,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 98
+        }
+      ],
+      "scenario_id": "scenario-20",
+      "description": "B deteriorates and C improves"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.1,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-21",
+      "description": "Strict hazard limit"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "fastest",
+      "max_hazard_index": 1.0,
+      "routes": [
+        {
+          "route_id": "A",
+          "distance_km": 70,
+          "eta_minutes": 90,
+          "rainfall_mm": 110,
+          "slope_deg": 42,
+          "elevation_m": 1200,
+          "historical_landslides": 9,
+          "road_condition_score": 30
+        },
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-22",
+      "description": "Relaxed hazard limit exposes fastest trade-off"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "B",
+          "distance_km": 100,
+          "eta_minutes": 125,
+          "rainfall_mm": 10,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 92
+        },
+        {
+          "route_id": "C",
+          "distance_km": 85,
+          "eta_minutes": 110,
+          "rainfall_mm": 55,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        }
+      ],
+      "scenario_id": "scenario-23",
+      "description": "Only two supplied alternatives"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "candidate-01",
+          "distance_km": 80,
+          "eta_minutes": 100,
+          "rainfall_mm": 0,
+          "slope_deg": 0,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 95
+        },
+        {
+          "route_id": "candidate-02",
+          "distance_km": 83,
+          "eta_minutes": 102,
+          "rainfall_mm": 13,
+          "slope_deg": 7,
+          "elevation_m": 1200,
+          "historical_landslides": 1,
+          "road_condition_score": 90
+        },
+        {
+          "route_id": "candidate-03",
+          "distance_km": 86,
+          "eta_minutes": 104,
+          "rainfall_mm": 26,
+          "slope_deg": 14,
+          "elevation_m": 1200,
+          "historical_landslides": 2,
+          "road_condition_score": 85
+        },
+        {
+          "route_id": "candidate-04",
+          "distance_km": 89,
+          "eta_minutes": 106,
+          "rainfall_mm": 39,
+          "slope_deg": 21,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 80
+        },
+        {
+          "route_id": "candidate-05",
+          "distance_km": 92,
+          "eta_minutes": 108,
+          "rainfall_mm": 52,
+          "slope_deg": 28,
+          "elevation_m": 1200,
+          "historical_landslides": 4,
+          "road_condition_score": 75
+        }
+      ],
+      "scenario_id": "scenario-24",
+      "description": "Compare five alternatives"
+    },
+    {
+      "data_kind": "synthetic",
+      "origin": "Guwahati",
+      "destination": "Shillong",
+      "vehicle": "car",
+      "cargo": "general",
+      "priority": "normal",
+      "max_hazard_index": 0.8,
+      "routes": [
+        {
+          "route_id": "candidate-01",
+          "distance_km": 80,
+          "eta_minutes": 100,
+          "rainfall_mm": 0,
+          "slope_deg": 0,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 95
+        },
+        {
+          "route_id": "candidate-02",
+          "distance_km": 83,
+          "eta_minutes": 102,
+          "rainfall_mm": 13,
+          "slope_deg": 7,
+          "elevation_m": 1200,
+          "historical_landslides": 1,
+          "road_condition_score": 90
+        },
+        {
+          "route_id": "candidate-03",
+          "distance_km": 86,
+          "eta_minutes": 104,
+          "rainfall_mm": 26,
+          "slope_deg": 14,
+          "elevation_m": 1200,
+          "historical_landslides": 2,
+          "road_condition_score": 85
+        },
+        {
+          "route_id": "candidate-04",
+          "distance_km": 89,
+          "eta_minutes": 106,
+          "rainfall_mm": 39,
+          "slope_deg": 21,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 80
+        },
+        {
+          "route_id": "candidate-05",
+          "distance_km": 92,
+          "eta_minutes": 108,
+          "rainfall_mm": 52,
+          "slope_deg": 28,
+          "elevation_m": 1200,
+          "historical_landslides": 4,
+          "road_condition_score": 75
+        },
+        {
+          "route_id": "candidate-06",
+          "distance_km": 95,
+          "eta_minutes": 110,
+          "rainfall_mm": 65,
+          "slope_deg": 35,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 70
+        },
+        {
+          "route_id": "candidate-07",
+          "distance_km": 98,
+          "eta_minutes": 112,
+          "rainfall_mm": 78,
+          "slope_deg": 2,
+          "elevation_m": 1200,
+          "historical_landslides": 1,
+          "road_condition_score": 65
+        },
+        {
+          "route_id": "candidate-08",
+          "distance_km": 101,
+          "eta_minutes": 114,
+          "rainfall_mm": 91,
+          "slope_deg": 9,
+          "elevation_m": 1200,
+          "historical_landslides": 2,
+          "road_condition_score": 60
+        },
+        {
+          "route_id": "candidate-09",
+          "distance_km": 104,
+          "eta_minutes": 116,
+          "rainfall_mm": 4,
+          "slope_deg": 16,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 95
+        },
+        {
+          "route_id": "candidate-10",
+          "distance_km": 107,
+          "eta_minutes": 118,
+          "rainfall_mm": 17,
+          "slope_deg": 23,
+          "elevation_m": 1200,
+          "historical_landslides": 4,
+          "road_condition_score": 90
+        },
+        {
+          "route_id": "candidate-11",
+          "distance_km": 110,
+          "eta_minutes": 120,
+          "rainfall_mm": 30,
+          "slope_deg": 30,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 85
+        },
+        {
+          "route_id": "candidate-12",
+          "distance_km": 113,
+          "eta_minutes": 122,
+          "rainfall_mm": 43,
+          "slope_deg": 37,
+          "elevation_m": 1200,
+          "historical_landslides": 1,
+          "road_condition_score": 80
+        },
+        {
+          "route_id": "candidate-13",
+          "distance_km": 116,
+          "eta_minutes": 124,
+          "rainfall_mm": 56,
+          "slope_deg": 4,
+          "elevation_m": 1200,
+          "historical_landslides": 2,
+          "road_condition_score": 75
+        },
+        {
+          "route_id": "candidate-14",
+          "distance_km": 119,
+          "eta_minutes": 126,
+          "rainfall_mm": 69,
+          "slope_deg": 11,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 70
+        },
+        {
+          "route_id": "candidate-15",
+          "distance_km": 122,
+          "eta_minutes": 128,
+          "rainfall_mm": 82,
+          "slope_deg": 18,
+          "elevation_m": 1200,
+          "historical_landslides": 4,
+          "road_condition_score": 65
+        },
+        {
+          "route_id": "candidate-16",
+          "distance_km": 125,
+          "eta_minutes": 130,
+          "rainfall_mm": 95,
+          "slope_deg": 25,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 60
+        },
+        {
+          "route_id": "candidate-17",
+          "distance_km": 128,
+          "eta_minutes": 132,
+          "rainfall_mm": 8,
+          "slope_deg": 32,
+          "elevation_m": 1200,
+          "historical_landslides": 1,
+          "road_condition_score": 95
+        },
+        {
+          "route_id": "candidate-18",
+          "distance_km": 131,
+          "eta_minutes": 134,
+          "rainfall_mm": 21,
+          "slope_deg": 39,
+          "elevation_m": 1200,
+          "historical_landslides": 2,
+          "road_condition_score": 90
+        },
+        {
+          "route_id": "candidate-19",
+          "distance_km": 134,
+          "eta_minutes": 136,
+          "rainfall_mm": 34,
+          "slope_deg": 6,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 85
+        },
+        {
+          "route_id": "candidate-20",
+          "distance_km": 137,
+          "eta_minutes": 138,
+          "rainfall_mm": 47,
+          "slope_deg": 13,
+          "elevation_m": 1200,
+          "historical_landslides": 4,
+          "road_condition_score": 80
+        },
+        {
+          "route_id": "candidate-21",
+          "distance_km": 140,
+          "eta_minutes": 140,
+          "rainfall_mm": 60,
+          "slope_deg": 20,
+          "elevation_m": 1200,
+          "historical_landslides": 0,
+          "road_condition_score": 75
+        },
+        {
+          "route_id": "candidate-22",
+          "distance_km": 143,
+          "eta_minutes": 142,
+          "rainfall_mm": 73,
+          "slope_deg": 27,
+          "elevation_m": 1200,
+          "historical_landslides": 1,
+          "road_condition_score": 70
+        },
+        {
+          "route_id": "candidate-23",
+          "distance_km": 146,
+          "eta_minutes": 144,
+          "rainfall_mm": 86,
+          "slope_deg": 34,
+          "elevation_m": 1200,
+          "historical_landslides": 2,
+          "road_condition_score": 65
+        },
+        {
+          "route_id": "candidate-24",
+          "distance_km": 149,
+          "eta_minutes": 146,
+          "rainfall_mm": 99,
+          "slope_deg": 1,
+          "elevation_m": 1200,
+          "historical_landslides": 3,
+          "road_condition_score": 60
+        },
+        {
+          "route_id": "candidate-25",
+          "distance_km": 152,
+          "eta_minutes": 148,
+          "rainfall_mm": 12,
+          "slope_deg": 8,
+          "elevation_m": 1200,
+          "historical_landslides": 4,
+          "road_condition_score": 95
+        }
+      ],
+      "scenario_id": "scenario-25",
+      "description": "Compare 25 alternatives"
+    }
+  ]
+}
