@@ -1,0 +1,7 @@
+{
+  "origin": "Guwahati",
+  "destination": "Shillong",
+  "vehicle": "truck",
+  "cargo": "medical_supplies",
+  "priority": "emergency"
+}
