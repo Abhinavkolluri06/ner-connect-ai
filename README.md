@@ -1,5 +1,23 @@
 # NER-Connect AI
 
+Backend optimization details, measured limits and verification commands:
+[performance report](docs/performance.md).
+
+## Trained experimental ML file demo
+
+```powershell
+cd C:\ner-connect-ai
+.\scripts\compare-ml.ps1 -FilePath .\examples\experimental-ml\scenario-01.json
+```
+
+25 separate ML-format examples are available. The locally trained Kentucky XGBoost
+model supplies landslide scores; route policy, flood and weather remain rules.
+This is **not NER-validated or operationally safe**. Training completed; held-out
+ROC-AUC is 0.844, but only 4 of 22 events were detected at the selected threshold.
+See the [run guide and model card](docs/experimental-ml-demo.md) and
+[executed audit notebook](docs/ml-training-audit.ipynb). Local model/data files are
+Git-ignored; the guide includes reproduction steps for another machine.
+
 ## Compare your own JSON file (offline demo)
 
 ```powershell
@@ -39,7 +57,9 @@ python -m venv .venv
 ```
 
 Python listens on `127.0.0.1:8001`. Start Go in a separate terminal. The Python service
-returns transparent heuristic hazard/accessibility signals; no real trained model is supplied.
+returns transparent heuristic hazard/accessibility signals by default; no approved
+NER model is supplied. The experimental trained model above is a separate opt-in
+file workflow and does not silently change these HTTP endpoints.
 Go keeps final scoring and ranking. See [Python architecture](docs/python-intelligence.md),
 [risk features](docs/risk-features.md), [model status](docs/ml-models.md),
 [training](docs/training.md) and [testing](docs/testing.md).

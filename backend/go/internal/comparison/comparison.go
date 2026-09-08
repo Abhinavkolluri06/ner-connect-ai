@@ -112,18 +112,19 @@ func (r Request) Validate() error {
 	if r.MaxHazardIndex != nil && (!finite(*r.MaxHazardIndex) || *r.MaxHazardIndex < 0 || *r.MaxHazardIndex > 1) {
 		return fmt.Errorf("max_hazard_index must be 0..1")
 	}
-	ids := map[string]bool{}
+	ids := make(map[string]bool, len(r.Routes))
 	for _, v := range r.Routes {
 		if strings.TrimSpace(v.RouteID) == "" || v.RouteID != strings.TrimSpace(v.RouteID) || len(v.RouteID) > 100 || ids[v.RouteID] {
 			return fmt.Errorf("route IDs must be nonempty, trimmed and unique")
 		}
 		ids[v.RouteID] = true
-		for name, s := range map[string]struct {
+		for _, s := range [...]struct {
+			name     string
 			p        *float64
 			min, max float64
-		}{"distance_km": {v.DistanceKM, .001, 5000}, "eta_minutes": {v.ETAMinutes, .001, 10080}, "rainfall_mm": {v.RainfallMM, 0, 5000}, "slope_deg": {v.SlopeDeg, 0, 90}, "elevation_m": {v.ElevationM, -500, 9000}, "road_condition_score": {v.RoadConditionScore, 0, 100}} {
+		}{{"distance_km", v.DistanceKM, .001, 5000}, {"eta_minutes", v.ETAMinutes, .001, 10080}, {"rainfall_mm", v.RainfallMM, 0, 5000}, {"slope_deg", v.SlopeDeg, 0, 90}, {"elevation_m", v.ElevationM, -500, 9000}, {"road_condition_score", v.RoadConditionScore, 0, 100}} {
 			if s.p == nil || !finite(*s.p) || *s.p < s.min || *s.p > s.max {
-				return fmt.Errorf("route %s: %s is required and must be %.3g..%.3g", v.RouteID, name, s.min, s.max)
+				return fmt.Errorf("route %s: %s is required and must be %.3g..%.3g", v.RouteID, s.name, s.min, s.max)
 			}
 		}
 		if v.HistoricalLandslides == nil || *v.HistoricalLandslides < 0 || *v.HistoricalLandslides > 1000000 {
@@ -143,6 +144,26 @@ func (r Request) Validate() error {
 func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
 
 func Evaluate(ctx context.Context, r Request) (Result, error) {
+	return evaluate(ctx, r, nil)
+}
+
+// EvaluateExperimental uses externally computed experimental landslide scores.
+// It retains the original heuristic hazard exclusion as an additional guard.
+// The caller must establish model provenance; these are not safety probabilities.
+func EvaluateExperimental(ctx context.Context, r Request, scores map[string]float64) (Result, error) {
+	if len(scores) != len(r.Routes) {
+		return Result{}, fmt.Errorf("experimental scores must cover every route exactly")
+	}
+	for _, route := range r.Routes {
+		score, ok := scores[route.RouteID]
+		if !ok || !finite(score) || score < 0 || score > 1 {
+			return Result{}, fmt.Errorf("invalid experimental score for %s", route.RouteID)
+		}
+	}
+	return evaluate(ctx, r, scores)
+}
+
+func evaluate(ctx context.Context, r Request, scores map[string]float64) (Result, error) {
 	if err := r.Validate(); err != nil {
 		return Result{}, err
 	}
@@ -160,7 +181,12 @@ func Evaluate(ctx context.Context, r Request) (Result, error) {
 		"All candidates must connect the same endpoints. Rainfall inputs must use the same 24-hour window; flat route features are representative summaries, not an exhaustive corridor survey.",
 		"Vehicle clearance is not verified; blocked_vehicles and closed are caller-supplied restrictions. Delay is supplied, not predicted.",
 	}}
-	inputs := []scoring.Input{}
+	if scores != nil {
+		out.ModelMode = "experimental_ml_hybrid"
+		out.Warnings[0] = "Experimental externally supplied landslide model scores; flood, weather, accessibility and final ranking remain rules. Not validated for NER."
+		out.Warnings = append(out.Warnings, "The original heuristic hazard limit also remains active: an experimental low score cannot clear a rule-flagged route.")
+	}
+	inputs := make([]scoring.Input, 0, len(r.Routes))
 	for _, v := range r.Routes {
 		if err := ctx.Err(); err != nil {
 			return Result{}, err
@@ -181,6 +207,12 @@ func Evaluate(ctx context.Context, r Request) (Result, error) {
 			return Result{}, err
 		}
 		highest := math.Max(risk.WeatherRisk, math.Max(risk.LandslideRisk, risk.FloodRisk))
+		if scores != nil {
+			risk.LandslideRisk = scores[v.RouteID]
+			highest = math.Max(highest, risk.LandslideRisk)
+			risk.AccessibilityScore = math.Max(0, math.Min(1, .60*(*v.RoadConditionScore/100)+.15*(1-math.Min(1, *v.SlopeDeg/45))+.10*(1-risk.WeatherRisk)+.15*(1-math.Max(risk.LandslideRisk, risk.FloodRisk))))
+			risk.ModelMode = "experimental_ml_hybrid"
+		}
 		if highest > limit {
 			reasons = append(reasons, fmt.Sprintf("Highest hazard index %.4f exceeds configured limit %.4f", highest, limit))
 		}
