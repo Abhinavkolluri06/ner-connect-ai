@@ -1,0 +1,43 @@
+{
+  "data_kind": "synthetic",
+  "origin": "Guwahati",
+  "destination": "Shillong",
+  "vehicle": "motorcycle",
+  "cargo": "general",
+  "priority": "normal",
+  "max_hazard_index": 0.8,
+  "routes": [
+    {
+      "route_id": "A",
+      "distance_km": 70,
+      "eta_minutes": 90,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90
+    },
+    {
+      "route_id": "B",
+      "distance_km": 100,
+      "eta_minutes": 125,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90
+    },
+    {
+      "route_id": "C",
+      "distance_km": 85,
+      "eta_minutes": 110,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90
+    }
+  ],
+  "scenario_id": "scenario-11",
+  "description": "Motorcycle on wet roads"
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "route_id": {
+      "title": "Route Id",
+      "type": "string"
+    },
+    "landslide_risk": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Landslide Risk",
+      "type": "number"
+    },
+    "flood_risk": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Flood Risk",
+      "type": "number"
+    },
+    "weather_risk": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Weather Risk",
+      "type": "number"
+    },
+    "accessibility_score": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Accessibility Score",
+      "type": "number"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "model_mode": {
+      "enum": [
+        "heuristic",
+        "ml"
+      ],
+      "title": "Model Mode",
+      "type": "string"
+    }
+  },
+  "required": [
+    "route_id",
+    "landslide_risk",
+    "flood_risk",
+    "weather_risk",
+    "accessibility_score",
+    "confidence",
+    "model_mode"
+  ],
+  "title": "RiskResponse",
+  "type": "object"
+}

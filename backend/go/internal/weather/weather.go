@@ -7,6 +7,7 @@ import (
 	"github.com/ner-connect-ai/backend-go/internal/models"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -23,6 +24,7 @@ func (DemoProvider) Weather(_ context.Context, r models.RouteCandidate) (models.
 	if !ok {
 		return models.Weather{}, fmt.Errorf("demo weather unavailable")
 	}
+	v.Source = "synthetic demo rainfall"
 	return v, nil
 }
 
@@ -59,7 +61,7 @@ func (p LiveProvider) Healthy(ctx context.Context) bool {
 	return resp.StatusCode < 500
 }
 func (p LiveProvider) Weather(ctx context.Context, r models.RouteCandidate) (models.Weather, error) {
-	endpoint := strings.TrimRight(p.BaseURL, "/") + "/weather?route_id=" + r.RouteID
+	endpoint := strings.TrimRight(p.BaseURL, "/") + "/weather?route_id=" + url.QueryEscape(r.RouteID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return models.Weather{}, err

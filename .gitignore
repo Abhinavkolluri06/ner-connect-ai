@@ -27,6 +27,16 @@ go.work.sum
 # env file
 .env
 
+# Runtime data and private provider feeds (never commit route histories or secrets)
+/data/
+/backend/go/data/
+/backend/go/server
+*.db
+*.results-*.json
+*.db-lock
+*.log
+/work/
+
 # Editor/IDE
 # .idea/
 # .vscode/

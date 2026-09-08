@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ner_connect
+      POSTGRES_USER: ner_connect
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ner_connect -d ner_connect"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks: [private]
+
+  intelligence:
+    build:
+      context: .
+      dockerfile: backend/python/Dockerfile
+    environment:
+      MODEL_MODE: ${MODEL_MODE:-heuristic}
+      ALLOW_MODEL_FALLBACK: ${ALLOW_MODEL_FALLBACK:-true}
+      LANDSLIDE_MODEL_PATH: ${LANDSLIDE_MODEL_PATH:-}
+      FLOOD_MODEL_PATH: ${FLOOD_MODEL_PATH:-}
+      MODEL_VERSION: ${MODEL_VERSION:-}
+    volumes:
+      - ./backend/python/model_artifacts:/models:ro
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [private]
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/go/Dockerfile
+    environment:
+      GO_HOST: 0.0.0.0
+      GO_PORT: "8080"
+      NER_ENV: ${NER_ENV:-development}
+      NER_DEMO_MODE: ${NER_DEMO_MODE:-false}
+      API_TOKEN: ${API_TOKEN:?Set a random API_TOKEN of at least 32 characters in .env}
+      PYTHON_SERVICE_URL: http://intelligence:8001
+      PYTHON_TIMEOUT_SECONDS: "5"
+      # Use a hex-only generated password, or percent-encode URL-special characters.
+      DATABASE_URL: postgres://ner_connect:${POSTGRES_PASSWORD}@postgres:5432/ner_connect?sslmode=disable
+      ROUTING_PROVIDER: ${ROUTING_PROVIDER:-osrm}
+      ROUTING_SERVICE_URL: ${ROUTING_SERVICE_URL:-https://router.project-osrm.org}
+      MAP_API_KEY: ${MAP_API_KEY:-}
+      WEATHER_PROVIDER: ${WEATHER_PROVIDER:-openmeteo}
+      WEATHER_SERVICE_URL: ${WEATHER_SERVICE_URL:-https://api.open-meteo.com}
+      TERRAIN_URL: ${TERRAIN_URL:-https://api.open-meteo.com}
+      GEOCODING_URL: ${GEOCODING_URL:-https://geocoding-api.open-meteo.com}
+      WEATHER_API_KEY: ${WEATHER_API_KEY:-}
+      ROAD_HAZARD_DATA_PATH: ${ROAD_HAZARD_DATA_PATH:-}
+      ROAD_HAZARD_DATA_URL: ${ROAD_HAZARD_DATA_URL:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      intelligence:
+        condition: service_started
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [private, egress]
+
+networks:
+  private:
+    internal: true
+  egress: {}
+
+volumes:
+  postgres_data: {}

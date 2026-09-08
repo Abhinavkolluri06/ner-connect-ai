@@ -3,11 +3,44 @@ package scoring
 import (
 	"github.com/ner-connect-ai/backend-go/internal/config"
 	"github.com/ner-connect-ai/backend-go/internal/models"
+	"math"
 	"testing"
 )
 
 func engine() Engine {
 	return Engine{Normal: config.Weights{Safety: .25, Reliability: .20, Accessibility: .20, ETA: .15, Weather: .10, Distance: .10}, Emergency: config.Weights{Safety: .35, Reliability: .25, Accessibility: .20, ETA: .15, Distance: .05}}
+}
+func TestPriorityVehicleCargoAndReliabilitySemantics(t *testing.T) {
+	inputs := []Input{
+		{Candidate: models.RouteCandidate{RouteID: "fast", DistanceKM: 100, ETAMinutes: 100, Reliability: .8}, Risk: models.RiskResponse{LandslideRisk: .8, FloodRisk: .4, WeatherRisk: .4, AccessibilityScore: .7}},
+		{Candidate: models.RouteCandidate{RouteID: "safe", DistanceKM: 90, ETAMinutes: 150, Reliability: .8}, Risk: models.RiskResponse{LandslideRisk: .1, FloodRisk: .1, WeatherRisk: .1, AccessibilityScore: .9}},
+	}
+	fast, _ := engine().Rank(inputs, "fastest")
+	safe, _ := engine().Rank(inputs, "safest")
+	if fast[0].RouteID != "fast" || safe[0].RouteID != "safe" {
+		t.Fatal("priority profiles have no effect")
+	}
+	car, _ := engine().RankRequest(inputs, models.AnalyzeRequest{Priority: "normal", Vehicle: "car", Cargo: "general"})
+	bike, _ := engine().RankRequest(inputs, models.AnalyzeRequest{Priority: "normal", Vehicle: "motorcycle", Cargo: "general"})
+	food, _ := engine().RankRequest(inputs, models.AnalyzeRequest{Priority: "normal", Vehicle: "car", Cargo: "food"})
+	if car[0].AccessibilityScore == bike[0].AccessibilityScore || car[0].FinalScore == food[0].FinalScore {
+		t.Fatal("vehicle/cargo does not affect scoring")
+	}
+	for _, r := range car {
+		sum := 0.0
+		for _, v := range r.ScoreBreakdown {
+			sum += v
+		}
+		if math.Abs(sum-r.FinalScore) > .000051 {
+			t.Fatal("breakdown differs from score")
+		}
+		if math.Abs(r.ReliabilityPercent/100-r.ReliabilityScore) > .000051 {
+			t.Fatal("percent scale mismatch")
+		}
+		if r.ReliabilityScore == r.RoadQualityScore {
+			t.Fatal("hazard-aware reliability not distinct from road quality")
+		}
+	}
 }
 func TestEmergencySafetyOutranksShorterDangerousRoute(t *testing.T) {
 	inputs := []Input{

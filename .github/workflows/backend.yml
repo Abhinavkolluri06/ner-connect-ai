@@ -1,0 +1,59 @@
+name: Backend checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ner_test
+          POSTGRES_PASSWORD: ci-only-ephemeral-password
+          POSTGRES_DB: ner_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ner_test -d ner_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      NER_TEST_DATABASE_URL: postgres://ner_test:ci-only-ephemeral-password@localhost:5432/ner_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: backend/go/go.sum
+      - run: go test -race ./...
+        working-directory: backend/go
+      - run: go vet ./...
+        working-directory: backend/go
+      - run: test -z "$(gofmt -l .)"
+        working-directory: backend/go
+  python-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          cache-dependency-path: backend/go/go.sum
+      - run: pip install -r backend/python/requirements-dev.txt -r backend/python/requirements-boosting.txt
+      - run: python -m pytest -q
+        working-directory: backend/python
+      - run: python -m ruff check .
+        working-directory: backend/python
+      - run: python scripts/smoke-python-go.py
+      - run: docker compose config --quiet
+        env:
+          API_TOKEN: ci-only-ephemeral-token-longer-than-32-chars
+          POSTGRES_PASSWORD: ci-only-ephemeral-password
+      - run: docker compose build
+        env:
+          API_TOKEN: ci-only-ephemeral-token-longer-than-32-chars
+          POSTGRES_PASSWORD: ci-only-ephemeral-password
