@@ -1,259 +1,193 @@
 "use client";
 
-import { useState } from "react";
-
-import AIExplanation from "@/components/AIExplanation";
-import MapView from "@/components/MapView";
-import RiskBreakdown from "@/components/RiskBreakdown";
-import RouteCard from "@/components/RouteCard";
-import RouteForm, { type RouteFormErrors } from "@/components/RouteForm";
-import { defaultRouteRequest, fetchSafeRoutes } from "@/lib/mock-routes";
-import type { RouteRequest, RouteResponse } from "@/lib/types";
-
-function validateRequest(request: RouteRequest): RouteFormErrors {
-  const errors: RouteFormErrors = {};
-  const origin = request.origin.trim();
-  const destination = request.destination.trim();
-
-  if (!origin) errors.origin = "Enter an origin.";
-  if (!destination) errors.destination = "Enter a destination.";
-
-  if (
-    origin &&
-    destination &&
-    origin.toLowerCase() === destination.toLowerCase()
-  ) {
-    errors.destination = "Choose a different destination.";
-  }
-
-  return errors;
-}
+import Link from "next/link";
+import DashboardQuote from "@/components/DashboardQuote";
 
 export default function Dashboard() {
-  const [request, setRequest] = useState<RouteRequest>(defaultRouteRequest);
-  const [result, setResult] = useState<RouteResponse | null>(null);
-  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-  const [showAllRoutes, setShowAllRoutes] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<RouteFormErrors>({});
-
-  async function saveRoutePlan(
-    routeResult: RouteResponse,
-    selectedRoute: string,
-  ) {
-    const response = await fetch("/api/route-plans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        origin: routeResult.origin,
-        destination: routeResult.destination,
-        vehicle: routeResult.vehicle,
-        cargo: routeResult.cargo,
-        priority: routeResult.priority,
-        result: routeResult,
-        selectedRoute,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Unable to save route plan.");
-    }
-  }
-
-  async function handleFindRoute() {
-    const nextErrors = validateRequest(request);
-    setFieldErrors(nextErrors);
-
-    if (Object.keys(nextErrors).length > 0) return;
-
-    setLoading(true);
-    setError(null);
-    setShowAllRoutes(false);
-
-    try {
-      const response = await fetchSafeRoutes(request);
-      const selectedId = response.recommendedRouteId;
-
-      setResult(response);
-      setSelectedRouteId(selectedId);
-
-      try {
-        await saveRoutePlan(response, selectedId);
-      } catch {
-        // Route calculation should remain usable even if persistence fails.
-      }
-    } catch (routeError) {
-      setError(
-        routeError instanceof Error
-          ? routeError.message
-          : "Route assessment is unavailable right now. Please try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const selectedRoute =
-    result?.routes.find((route) => route.id === selectedRouteId) ??
-    result?.routes.find((route) => route.id === result.recommendedRouteId);
-
-  const recommendedRoute = result?.routes.find(
-    (route) => route.id === result.recommendedRouteId,
-  );
-
-  const visibleRoutes =
-    result && showAllRoutes ? result.routes : result?.routes.slice(0, 3) ?? [];
-
-  const additionalRouteCount =
-    result && result.routes.length > 3 ? result.routes.length - 3 : 0;
-
-  const selectedRouteExplanation =
-    recommendedRoute && selectedRoute
-      ? selectedRoute.id === recommendedRoute.id
-        ? `${recommendedRoute.name} is recommended because it provides the strongest overall balance of travel time, disruption risk, and reliability. It has an estimated risk of ${recommendedRoute.overallRisk}% and a reliability score of ${recommendedRoute.reliability}/100.`
-        : `${recommendedRoute.name} is the recommended route because it provides the strongest overall balance of travel time, disruption risk, and reliability. ${selectedRoute.name} remains available as an alternative with ${selectedRoute.overallRisk}% estimated risk and ${selectedRoute.reliability}/100 reliability.`
-      : "";
-
   return (
-    <main className="w-full px-4 py-5 sm:px-5 lg:px-6">
-      {/* Main command-center row */}
-      <div className="grid items-start gap-4 xl:grid-cols-[310px_minmax(0,1fr)_310px]">
-        {/* LEFT — Route Planner */}
-        <div className="min-w-0">
-          <RouteForm
-            value={request}
-            loading={loading}
-            errors={fieldErrors}
-            onChange={(next) => {
-              setRequest(next);
-              setFieldErrors({});
-              setError(null);
-            }}
-            onSubmit={handleFindRoute}
-          />
+    <main className="min-h-[calc(100vh-73px)] w-full bg-slate-100 px-4 py-5 sm:px-5 lg:px-6">
+      <div className="w-full">
 
-          {error ? (
-            <p className="mt-2 px-1 text-xs text-red-800" role="alert">
-              {error}
+        {/* Today's Thought */}
+        <DashboardQuote />
+
+        {/* Main dashboard row */}
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_350px]">
+
+          {/* Route Planner */}
+          <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-5">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700">
+                  Primary Workspace
+                </p>
+
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-navy-900">
+                  Route Planner
+                </h1>
+
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                  Calculate road alternatives, compare disruption risk and
+                  reliability, and identify the route that best fits your
+                  vehicle, cargo, and priority.
+                </p>
+              </div>
+
+              <span className="hidden rounded-md bg-emerald-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-emerald-700 sm:block">
+                Core
+                <br />
+                Service
+              </span>
+            </div>
+
+            {/* Three service areas */}
+            <div className="mt-7 grid gap-5 md:grid-cols-3">
+
+              <div className="border-l-2 border-emerald-500 pl-3">
+                <p className="text-xs text-slate-500">
+                  Route alternatives
+                </p>
+
+                <p className="mt-1 text-sm font-bold leading-5 text-navy-900">
+                  Compare available
+                  <br />
+                  corridors
+                </p>
+              </div>
+
+              <div className="border-l-2 border-blue-500 pl-3">
+                <p className="text-xs text-slate-500">
+                  Risk assessment
+                </p>
+
+                <p className="mt-1 text-sm font-bold leading-5 text-navy-900">
+                  Landslide, flood &amp;
+                  <br />
+                  weather
+                </p>
+              </div>
+
+              <div className="border-l-2 border-orange-500 pl-3">
+                <p className="text-xs text-slate-500">
+                  Reliability
+                </p>
+
+                <p className="mt-1 text-sm font-bold leading-5 text-navy-900">
+                  Choose more dependable
+                  <br />
+                  routes
+                </p>
+              </div>
+
+            </div>
+
+            {/* Open planner */}
+            <Link
+              href="/route-planner"
+              className="mt-7 inline-flex h-10 items-center rounded-md bg-navy-900 px-5 text-sm font-bold text-white transition hover:bg-navy-800"
+            >
+              Open Route Planner →
+            </Link>
+          </section>
+
+          {/* Quick Access */}
+          <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+              Workspace
             </p>
-          ) : null}
+
+            <h2 className="mt-1 text-xl font-bold text-navy-900">
+              Quick Access
+            </h2>
+
+            <div className="mt-6 space-y-2">
+
+              <Link
+                href="/bookmarks"
+                className="flex h-16 items-center justify-between rounded-md border border-slate-200 px-4 text-sm font-semibold text-navy-900 transition hover:bg-slate-50"
+              >
+                <span>Saved Route Bookmarks</span>
+                <span>→</span>
+              </Link>
+
+              <Link
+                href="/accessibility"
+                className="flex h-16 items-center justify-between rounded-md border border-slate-200 px-4 text-sm font-semibold text-navy-900 transition hover:bg-slate-50"
+              >
+                <span>Accessibility</span>
+                <span>→</span>
+              </Link>
+
+              <Link
+                href="/about"
+                className="flex h-16 items-center justify-between rounded-md border border-slate-200 px-4 text-sm font-semibold text-navy-900 transition hover:bg-slate-50"
+              >
+                <span>About NER-Connect AI</span>
+                <span>→</span>
+              </Link>
+
+            </div>
+          </section>
         </div>
 
-        {/* CENTER — Map */}
-        <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="flex h-12 items-center justify-between border-b border-slate-200 px-4">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-navy-900">
-                Live Route Map
-              </h2>
-              {result ? (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                  {result.routes.length} routes
-                </span>
-              ) : null}
-            </div>
+        {/* System Overview */}
+        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
 
-            <div className="hidden items-center gap-3 text-[10px] text-slate-500 sm:flex">
-              <span className="flex items-center gap-1.5">
-                <i className="h-2 w-5 rounded-full bg-emerald-600" />
-                Recommended
-              </span>
-              <span className="flex items-center gap-1.5">
-                <i className="h-2 w-5 rounded-full bg-blue-600" />
-                Alternative
-              </span>
-              <span className="flex items-center gap-1.5">
-                <i className="h-2 w-5 rounded-full bg-orange-600" />
-                Other
-              </span>
-            </div>
-          </div>
+          <div className="flex items-center justify-between gap-4">
 
-          <div className="h-[500px] w-full">
-            <MapView
-              origin={result?.origin ?? request.origin}
-              destination={result?.destination ?? request.destination}
-              routes={result?.routes ?? []}
-              selectedRouteId={selectedRouteId}
-            />
-          </div>
-        </section>
-
-        {/* RIGHT — AI Explanation */}
-        <div className="min-w-0">
-          <AIExplanation
-            title={
-              recommendedRoute
-                ? `Why ${recommendedRoute.name}?`
-                : "Why this route?"
-            }
-            body={
-              selectedRouteExplanation ||
-              "Run a route assessment to see the recommended corridor and the reasons behind the recommendation."
-            }
-          />
-        </div>
-      </div>
-
-      {/* ROUTE OPTIONS — only first 3 initially */}
-      {result ? (
-        <section className="mt-5">
-          <div className="mb-3 flex items-end justify-between">
             <div>
-              <h2 className="text-base font-bold text-navy-900">
-                Route Options ({result.routes.length})
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                System Overview
+              </p>
+
+              <h2 className="mt-1 text-xl font-bold text-navy-900">
+                NER-Connect AI
               </h2>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Showing the leading alternatives first.
+            </div>
+
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              Route services online
+            </div>
+
+          </div>
+
+          <div className="mt-5 grid gap-6 border-t border-slate-200 pt-5 md:grid-cols-3">
+
+            <div>
+              <p className="text-xs font-semibold text-slate-500">
+                Navigation
+              </p>
+
+              <p className="mt-1 text-sm leading-5 text-slate-600">
+                Route planning and alternative corridor assessment.
               </p>
             </div>
 
-            <span className="text-xs text-slate-500">
-              {result.routes.length} available
-            </span>
-          </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500">
+                Resilience
+              </p>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {visibleRoutes.map((route) => (
-              <RouteCard
-                key={route.id}
-                route={route}
-                selected={selectedRouteId === route.id}
-                onSelect={setSelectedRouteId}
-              />
-            ))}
-          </div>
+              <p className="mt-1 text-sm leading-5 text-slate-600">
+                Risk-aware decisions for challenging road conditions.
+              </p>
+            </div>
 
-          {additionalRouteCount > 0 ? (
-            <button
-              type="button"
-              onClick={() => setShowAllRoutes((current) => !current)}
-              className="mt-3 h-9 w-full rounded-md border border-slate-300 bg-white text-xs font-semibold text-navy-900 hover:bg-slate-50"
-            >
-              {showAllRoutes
-                ? "Show fewer routes"
-                : `Show ${additionalRouteCount} more routes`}
-            </button>
-          ) : null}
+            <div>
+              <p className="text-xs font-semibold text-slate-500">
+                Accessibility
+              </p>
+
+              <p className="mt-1 text-sm leading-5 text-slate-600">
+                Route information designed to support dependable movement.
+              </p>
+            </div>
+
+          </div>
         </section>
-      ) : null}
 
-      {/* COMPACT RISK ASSESSMENT */}
-      {result && selectedRoute ? (
-        <section className="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3">
-            <h2 className="text-base font-bold text-navy-900">
-              Risk Assessment — {selectedRoute.name}
-            </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Landslide, flood, weather and road-condition indicators.
-            </p>
-          </div>
-
-          <RiskBreakdown risks={selectedRoute.risks} />
-        </section>
-      ) : null}
+      </div>
     </main>
   );
 }

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   {
-    href: "/",
+    href: "/route-planner",
     label: "Route Planner",
   },
   {
@@ -25,13 +25,9 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const supabase = createClient();
-
-  const [isLoggedIn, setIsLoggedIn] =
-    useState(false);
-
-  const [loading, setLoading] =
-    useState(true);
+  const [supabase] = useState(() => createClient());
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function checkSession() {
@@ -47,15 +43,10 @@ export default function Header() {
 
     const {
       data: { subscription },
-    } =
-      supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          setIsLoggedIn(
-            Boolean(session),
-          );
-          setLoading(false);
-        },
-      );
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(Boolean(session));
+      setLoading(false);
+    });
 
     return () => {
       subscription.unsubscribe();
@@ -73,28 +64,23 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-[2000] border-b border-white/10 bg-navy-900 text-white">
-      <div className="mx-auto flex h-[4.25rem] max-w-[1400px] items-center justify-between px-4 sm:px-6">
-        <Link
-          href="/"
-          className="min-w-0"
-        >
+      <div className="flex h-[4.25rem] items-center justify-between px-6">
+        <Link href="/" className="min-w-0">
           <span className="block text-[16px] font-bold leading-tight tracking-tight">
             NER-Connect AI
           </span>
 
           <span className="mt-0.5 block text-[10px] font-medium tracking-wide text-slate-300">
-            SMART LOGISTICS &amp;
-            ACCESSIBILITY INTELLIGENCE
+            SMART LOGISTICS &amp; ACCESSIBILITY INTELLIGENCE
           </span>
         </Link>
 
-        <nav
-          aria-label="Primary"
-          className="flex items-center gap-1"
-        >
+        <nav aria-label="Primary" className="flex items-center gap-1">
           {navItems.map((item) => {
             const active =
-              pathname === item.href;
+              item.href === "/route-planner"
+                ? pathname === "/route-planner" || pathname === "/"
+                : pathname.startsWith(item.href);
 
             return (
               <Link
@@ -111,8 +97,7 @@ export default function Header() {
             );
           })}
 
-          {!loading &&
-          !isLoggedIn ? (
+          {!loading && !isLoggedIn ? (
             <Link
               href="/login"
               className="ml-2 rounded-md border border-white/20 px-3 py-2 text-xs font-medium text-white hover:bg-white/10"
@@ -121,8 +106,7 @@ export default function Header() {
             </Link>
           ) : null}
 
-          {!loading &&
-          isLoggedIn ? (
+          {!loading && isLoggedIn ? (
             <button
               type="button"
               onClick={handleSignOut}

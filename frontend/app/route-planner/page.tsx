@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import Dashboard from "@/components/Dashboard";
+import RoutePlanner from "@/components/RoutePlanner";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "Route Planner",
 };
 
-export default function Home() {
+export default function RoutePlannerPage() {
   return (
     <Suspense fallback={null}>
-      <Dashboard />
+      <RoutePlanner />
     </Suspense>
   );
 }
