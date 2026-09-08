@@ -3,10 +3,43 @@ package comparison
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"os"
 	"strings"
 	"testing"
 )
+
+func TestExperimentalGuardsAndCoverage(t *testing.T) {
+	r := input(t)
+	for _, scores := range []map[string]float64{nil, {"A": .1}, {"A": .1, "B": math.NaN()}, {"A": .1, "C": .2}, {"A": .1, "B": 2}} {
+		if _, err := EvaluateExperimental(context.Background(), r, scores); err == nil {
+			t.Fatal("invalid scores accepted")
+		}
+	}
+	out, err := EvaluateExperimental(context.Background(), r, map[string]float64{"A": 0, "B": .2})
+	if err != nil || out.ModelMode != "experimental_ml_hybrid" || out.RecommendedRouteID != "B" || len(out.Excluded) != 1 {
+		t.Fatalf("experimental score cleared unsafe route: %+v %v", out, err)
+	}
+	r.Routes[1].Closed = true
+	out, err = EvaluateExperimental(context.Background(), r, map[string]float64{"A": 0, "B": 0})
+	if err != nil || out.Status != "no_eligible_routes" {
+		t.Fatal("closed route recommended")
+	}
+}
+
+func TestExperimentalScoreChangesRanking(t *testing.T) {
+	r := input(t)
+	r.Routes[0] = r.Routes[1]
+	r.Routes[0].RouteID = "A"
+	first, err := EvaluateExperimental(context.Background(), r, map[string]float64{"A": .1, "B": .7})
+	if err != nil || first.RecommendedRouteID != "A" {
+		t.Fatal("low hazard score not ranked first")
+	}
+	second, err := EvaluateExperimental(context.Background(), r, map[string]float64{"A": .7, "B": .1})
+	if err != nil || second.RecommendedRouteID != "B" {
+		t.Fatal("ranking did not respond to model scores")
+	}
+}
 
 const sample = `{"vehicle":"car","cargo":"general","priority":"safest","routes":[{"route_id":"A","distance_km":70,"eta_minutes":90,"rainfall_mm":110,"slope_deg":42,"elevation_m":1200,"historical_landslides":9,"road_condition_score":30},{"route_id":"B","distance_km":100,"eta_minutes":125,"rainfall_mm":10,"slope_deg":8,"elevation_m":1200,"historical_landslides":0,"road_condition_score":92}]}`
 
@@ -17,6 +50,26 @@ func input(t *testing.T) Request {
 		t.Fatal(err)
 	}
 	return r
+}
+
+func BenchmarkComparison25(b *testing.B) {
+	var r Request
+	if err := Decode(strings.NewReader(sample), &r); err != nil {
+		b.Fatal(err)
+	}
+	base := r.Routes[1]
+	r.Routes = make([]Route, 25)
+	for i := range r.Routes {
+		r.Routes[i] = base
+		r.Routes[i].RouteID = string(rune('A' + i))
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := Evaluate(context.Background(), r); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 func TestComparisonRespondsToDataNotIDs(t *testing.T) {
 	r := input(t)

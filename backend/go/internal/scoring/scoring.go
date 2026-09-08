@@ -64,7 +64,8 @@ func (e Engine) RankRequest(inputs []Input, request models.AnalyzeRequest) ([]mo
 		hazard := .50*v.Risk.LandslideRisk + .25*v.Risk.FloodRisk + .25*v.Risk.WeatherRisk
 		safety := clamp(1 - hazard)
 		access := clamp(v.Risk.AccessibilityScore)
-		policy := append([]string{}, notes...)
+		policy := make([]string, len(notes), len(notes)+1+len(v.Candidate.PolicyNotes))
+		copy(policy, notes)
 		switch request.Vehicle {
 		case "motorcycle":
 			access *= 1 - .25*v.Risk.WeatherRisk
@@ -83,7 +84,7 @@ func (e Engine) RankRequest(inputs []Input, request models.AnalyzeRequest) ([]mo
 		etaGood := inverse(v.Candidate.ETAMinutes, minE, maxE)
 		distanceGood := inverse(v.Candidate.DistanceKM, minD, maxD)
 		parts := map[string]float64{"safety": weights.Safety * safety, "reliability": weights.Reliability * reliability, "accessibility": weights.Accessibility * access, "eta": weights.ETA * etaGood, "weather": weights.Weather * weatherGood, "distance": weights.Distance * distanceGood}
-		score := parts["safety"] + parts["reliability"] + parts["accessibility"] + parts["eta"] + parts["weather"] + parts["distance"]
+		score := weights.Safety*safety + weights.Reliability*reliability + weights.Accessibility*access + weights.ETA*etaGood + weights.Weather*weatherGood + weights.Distance*distanceGood
 		mode := v.Risk.ModelMode
 		if mode == "" {
 			mode = "unspecified"

@@ -128,8 +128,15 @@ func (HeuristicFallbackRiskProvider) AnalyzeRisk(ctx context.Context, r models.R
 	if err := ctx.Err(); err != nil {
 		return models.RiskResponse{}, err
 	}
-	land, floods, weatherRisks, accessibility := []float64{}, []float64{}, []float64{}, []float64{}
-	for _, s := range r.Segments {
+	n := len(r.Segments)
+	var single [3]float64
+	storage := single[:]
+	if n > 1 {
+		storage = make([]float64, 3*n)
+	}
+	land, floods, weatherRisks := storage[:n:n], storage[n:2*n:2*n], storage[2*n:3*n:3*n]
+	minAccess, mean := 1.0, 0.0
+	for i, s := range r.Segments {
 		for _, v := range []float64{s.RainfallMM, s.SlopeDeg, s.ElevationM, s.RoadConditionScore} {
 			if math.IsNaN(v) || math.IsInf(v, 0) {
 				return models.RiskResponse{}, fmt.Errorf("non-finite segment feature")
@@ -145,17 +152,12 @@ func (HeuristicFallbackRiskProvider) AnalyzeRisk(ctx context.Context, r models.R
 		road := clamp(s.RoadConditionScore / 100)
 		l := clamp(.30*rain + .35*slope + .25*history + .10*(1-road))
 		f := clamp(.65*rain + .20*(1-elevation) + .15*(1-slope))
-		land = append(land, l)
-		floods = append(floods, f)
-		weatherRisks = append(weatherRisks, rain)
-		accessibility = append(accessibility, clamp(.60*road+.15*(1-slope)+.10*(1-rain)+.15*(1-math.Max(l, f))))
-	}
-	minAccess, mean := 1.0, 0.0
-	for _, a := range accessibility {
+		land[i], floods[i], weatherRisks[i] = l, f, rain
+		a := clamp(.60*road + .15*(1-slope) + .10*(1-rain) + .15*(1-math.Max(l, f)))
 		minAccess = math.Min(minAccess, a)
 		mean += a
 	}
-	mean /= float64(len(accessibility))
+	mean /= float64(n)
 	// Confidence is required-field completeness, NOT statistical confidence.
 	return models.RiskResponse{RouteID: r.RouteID, LandslideRisk: aggregate(land), FloodRisk: aggregate(floods), WeatherRisk: aggregate(weatherRisks), AccessibilityScore: clamp(.6*minAccess + .4*mean), Confidence: 1, ModelMode: "heuristic"}, nil
 }

@@ -1,0 +1,70 @@
+{
+  "data_kind": "synthetic",
+  "origin": "Guwahati",
+  "destination": "Shillong",
+  "vehicle": "motorcycle",
+  "cargo": "general",
+  "priority": "normal",
+  "max_hazard_index": 0.8,
+  "routes": [
+    {
+      "route_id": "A",
+      "distance_km": 70,
+      "eta_minutes": 90,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90,
+      "ml_features": {
+        "TotalPrecip_tavg": 0.00099515,
+        "SWE_tavg": 0.0,
+        "SoilMoist_tavg": 0.335971,
+        "contact_density": 1095.2502,
+        "lithology": 0.2079952,
+        "distance_to_mine": 19360.671,
+        "slope": 5
+      }
+    },
+    {
+      "route_id": "B",
+      "distance_km": 100,
+      "eta_minutes": 125,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90,
+      "ml_features": {
+        "TotalPrecip_tavg": 0.0002247,
+        "SWE_tavg": 0.0,
+        "SoilMoist_tavg": 0.261141,
+        "contact_density": 1470.7718,
+        "lithology": 0.0935857,
+        "distance_to_mine": 35234.782,
+        "slope": 5
+      }
+    },
+    {
+      "route_id": "C",
+      "distance_km": 85,
+      "eta_minutes": 110,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90,
+      "ml_features": {
+        "TotalPrecip_tavg": 7.099e-05,
+        "SWE_tavg": 0.0,
+        "SoilMoist_tavg": 0.331465,
+        "contact_density": 572.3545,
+        "lithology": 0.3623572,
+        "distance_to_mine": 137541.664,
+        "slope": 5
+      }
+    }
+  ],
+  "scenario_id": "scenario-11",
+  "description": "SYNTHETIC ML software demonstration; not measured NER features. Motorcycle on wet roads"
+}

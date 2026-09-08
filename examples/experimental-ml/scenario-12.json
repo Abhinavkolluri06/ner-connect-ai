@@ -1,0 +1,70 @@
+{
+  "data_kind": "synthetic",
+  "origin": "Guwahati",
+  "destination": "Shillong",
+  "vehicle": "car",
+  "cargo": "general",
+  "priority": "normal",
+  "max_hazard_index": 0.8,
+  "routes": [
+    {
+      "route_id": "A",
+      "distance_km": 70,
+      "eta_minutes": 90,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90,
+      "ml_features": {
+        "TotalPrecip_tavg": 7.086e-05,
+        "SWE_tavg": 0.0,
+        "SoilMoist_tavg": 0.237121,
+        "contact_density": 1672.4444,
+        "lithology": 0.0872662,
+        "distance_to_mine": 21169.896,
+        "slope": 5
+      }
+    },
+    {
+      "route_id": "B",
+      "distance_km": 100,
+      "eta_minutes": 125,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90,
+      "ml_features": {
+        "TotalPrecip_tavg": 0.00093551,
+        "SWE_tavg": 0.0,
+        "SoilMoist_tavg": 0.31705,
+        "contact_density": 1181.6776,
+        "lithology": 0.3142785,
+        "distance_to_mine": 129199.52,
+        "slope": 5
+      }
+    },
+    {
+      "route_id": "C",
+      "distance_km": 85,
+      "eta_minutes": 110,
+      "rainfall_mm": 36,
+      "slope_deg": 5,
+      "elevation_m": 1200,
+      "historical_landslides": 0,
+      "road_condition_score": 90,
+      "ml_features": {
+        "TotalPrecip_tavg": 0.00019041,
+        "SWE_tavg": 0.0,
+        "SoilMoist_tavg": 0.203263,
+        "contact_density": 1077.628,
+        "lithology": 0.1705843,
+        "distance_to_mine": 74723.947,
+        "slope": 5
+      }
+    }
+  ],
+  "scenario_id": "scenario-12",
+  "description": "SYNTHETIC ML software demonstration; not measured NER features. Car on the same wet roads"
+}

@@ -33,7 +33,15 @@ func main() {
 func run() error {
 	input := flag.String("file", "", "Path to a single comparison or batch JSON file")
 	output := flag.String("out", "", "New output JSON file (existing files are never overwritten)")
+	experimental := flag.String("experimental-scores", "", "Local experimental landslide score JSON; single scenario only")
+	jsonStdin := flag.Bool("json-stdin", false, "Read bounded request/scores JSON from stdin; write only result JSON to stdout")
 	flag.Parse()
+	if *jsonStdin {
+		if *input != "" || *output != "" || *experimental != "" {
+			return fmt.Errorf("json-stdin cannot be combined with file flags")
+		}
+		return runJSON(os.Stdin, os.Stdout)
+	}
 	if *input == "" {
 		fmt.Print("Enter your JSON file path: ")
 		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -79,14 +87,39 @@ func run() error {
 		return fmt.Errorf("file must contain 1..100 scenarios")
 	}
 	rows := []Row{}
+	var scores map[string]float64
+	mode := "heuristic"
+	if *experimental != "" {
+		if len(scenarios) != 1 {
+			return fmt.Errorf("experimental scores require a single scenario")
+		}
+		stream, err := os.Open(*experimental)
+		if err != nil {
+			return err
+		}
+		defer stream.Close()
+		if err := comparison.Decode(stream, &scores); err != nil {
+			return err
+		}
+		if scores == nil {
+			return fmt.Errorf("experimental scores cannot be null")
+		}
+		mode = "experimental_ml_hybrid"
+	}
 	failed := false
-	fmt.Println("Rule-based JSON comparison — no network or trained ML. Scores are not safety probabilities.")
+	fmt.Printf("JSON comparison mode: %s. Scores are not safety probabilities.\n", mode)
 	for i, req := range scenarios {
 		id := req.ScenarioID
 		if id == "" {
 			id = fmt.Sprintf("scenario-%02d", i+1)
 		}
-		out, err := comparison.Evaluate(context.Background(), req)
+		var out comparison.Result
+		var err error
+		if scores != nil {
+			out, err = comparison.EvaluateExperimental(context.Background(), req, scores)
+		} else {
+			out, err = comparison.Evaluate(context.Background(), req)
+		}
 		if err != nil {
 			rows = append(rows, Row{ScenarioID: id, Error: err.Error()})
 			fmt.Printf("\n%s INVALID: %v\n", id, err)
@@ -110,7 +143,7 @@ func run() error {
 		stem := strings.TrimSuffix(*input, filepath.Ext(*input))
 		*output = stem + ".results-" + time.Now().Format("20060102-150405.000000000") + ".json"
 	}
-	data, err := json.MarshalIndent(map[string]any{"model_mode": "heuristic", "scenario_count": len(rows), "results": rows}, "", "  ")
+	data, err := json.MarshalIndent(map[string]any{"model_mode": mode, "scenario_count": len(rows), "results": rows}, "", "  ")
 	if err != nil {
 		return err
 	}
