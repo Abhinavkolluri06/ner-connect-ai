@@ -138,3 +138,38 @@ This script validates:
 2. **Never Treat Missing Data as Safe**: If weather or hazard sensors are missing or offline, the system marks them as `unavailable` or `degraded`. It never pretends missing rainfall means zero flood risk.
 3. **Deterministic Tie-Breaking & Trade-Off Guards**: Small ETA differences (<3 minutes) are guarded to prevent relative normalization from producing wild score swings on near-identical routes.
 4. **GeoJSON Geometric Truth**: The exact GeoJSON coordinates calculated by the routing engine and scored by the backend flow directly to the interactive Leaflet map and saved bookmarks. The frontend never invents or guesses route paths.
+
+---
+
+## 5. Database Backup, Restore, and History Retention Policy
+
+### A. BoltDB (Embedded Development/Standalone Mode)
+- **File Location**: Configured via `DATA_PATH` (default: `data/ner-connect.db`).
+- **Hot Backup**:
+  ```bash
+  # Install bbolt CLI if needed: go install go.etcd.io/bbolt/cmd/bbolt@latest
+  bbolt dump data/ner-connect.db > backup-$(date +%Y%m%d).db
+  # Or copy when Go server process is stopped:
+  cp data/ner-connect.db data/ner-connect-backup.db
+  ```
+- **Restore**:
+  ```bash
+  # Stop Go server, replace database file, and restart
+  cp data/ner-connect-backup.db data/ner-connect.db
+  ```
+
+### B. PostgreSQL (Production / Containerized Cluster)
+- **Database Backup**:
+  ```bash
+  docker compose exec -T postgres pg_dump -U ner_connect -Fc ner_connect > ner_connect_backup_$(date +%Y%m%d).dump
+  ```
+- **Database Restore**:
+  ```bash
+  docker compose exec -T postgres pg_restore -U ner_connect -d ner_connect --clean --if-exists ner_connect_backup.dump
+  ```
+
+### C. History Retention and Purge Policy
+- **Automated Retention**: Historical route assessments are subject to a 90-day retention window. Older assessment records can be pruned using the database engine's `PruneOlderThan(ctx, cutoff)` API.
+- **User Self-Serve Purge**: Authenticated users have full control to immediately delete any of their historical assessments via `DELETE /api/v1/analyses/{id}`. Ownership is strictly enforced; attempting to delete another user's assessment yields `HTTP 403 Forbidden`.
+- **Bookmarks Immortality**: Saved bookmarks (`/api/v1/bookmarks`) are exempt from 90-day retention until explicitly deleted by their owner, preserving audit trails and key critical transport routes.
+

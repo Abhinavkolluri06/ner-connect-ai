@@ -145,7 +145,16 @@ func TestBookmarksAndUserIsolationAPI(t *testing.T) {
 		t.Fatalf("expected 200 when User A deletes bookmark, got %d", recDelA.Code)
 	}
 
-	// 10. User A deletes their analysis -> 200 OK
+	// 10. User B attempts to delete User A's analysis -> 403 Forbidden
+	reqDelAnalysisB := httptest.NewRequest(http.MethodDelete, "/api/v1/analyses/"+analysis.RequestID, nil)
+	reqDelAnalysisB.Header.Set("X-User-ID", "user-beta")
+	recDelAnalysisB := httptest.NewRecorder()
+	h.ServeHTTP(recDelAnalysisB, reqDelAnalysisB)
+	if recDelAnalysisB.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when User B attempts to delete User A's analysis, got %d", recDelAnalysisB.Code)
+	}
+
+	// 11. User A deletes their analysis -> 200 OK
 	reqDelAnalysis := httptest.NewRequest(http.MethodDelete, "/api/v1/analyses/"+analysis.RequestID, nil)
 	reqDelAnalysis.Header.Set("X-User-ID", "user-alpha")
 	recDelAnalysis := httptest.NewRecorder()
@@ -154,3 +163,4 @@ func TestBookmarksAndUserIsolationAPI(t *testing.T) {
 		t.Fatalf("expected 200 when User A deletes analysis, got %d", recDelAnalysis.Code)
 	}
 }
+

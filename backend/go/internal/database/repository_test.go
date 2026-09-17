@@ -207,3 +207,68 @@ func TestUserIsolationAndBookmarks(t *testing.T) {
 		})
 	}
 }
+
+func TestHistoryRetentionPrune(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "bolt_prune_test.db")
+	boltRepo, err := OpenBolt(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer boltRepo.Close()
+
+	inMemoryRepo := NewInMemoryRepository()
+
+	repos := []struct {
+		name string
+		repo HistoryRepository
+	}{
+		{"InMemory", inMemoryRepo},
+		{"Bolt", boltRepo},
+	}
+
+	for _, tc := range repos {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Now().UTC()
+			oldRecord := models.AnalysisRecord{
+				RequestID:   "old-req-1",
+				CreatedAt:   now.Add(-100 * 24 * time.Hour), // 100 days old
+				OwnerUserID: "user-alpha",
+				Request:     models.AnalyzeRequest{Origin: "Shillong"},
+			}
+			newRecord := models.AnalysisRecord{
+				RequestID:   "new-req-2",
+				CreatedAt:   now.Add(-10 * 24 * time.Hour), // 10 days old
+				OwnerUserID: "user-alpha",
+				Request:     models.AnalyzeRequest{Origin: "Guwahati"},
+			}
+			if err := tc.repo.Save(ctx, oldRecord); err != nil {
+				t.Fatalf("save old: %v", err)
+			}
+			if err := tc.repo.Save(ctx, newRecord); err != nil {
+				t.Fatalf("save new: %v", err)
+			}
+
+			// Prune older than 90 days
+			cutoff := now.Add(-90 * 24 * time.Hour)
+			pruned, err := tc.repo.PruneOlderThan(ctx, cutoff)
+			if err != nil {
+				t.Fatalf("prune failed: %v", err)
+			}
+			if pruned != 1 {
+				t.Fatalf("expected 1 pruned record, got %d", pruned)
+			}
+
+			// Verify old is gone and new is retained
+			_, err = tc.repo.Get(ctx, "old-req-1")
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("expected old record to be deleted, got %v", err)
+			}
+			rec, err := tc.repo.Get(ctx, "new-req-2")
+			if err != nil || rec.RequestID != "new-req-2" {
+				t.Fatalf("expected new record to be retained, got %+v %v", rec, err)
+			}
+		})
+	}
+}
+

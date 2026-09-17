@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/ner-connect-ai/backend-go/internal/models"
 )
@@ -24,6 +25,7 @@ type HistoryRepository interface {
 	List(context.Context, int, int) ([]models.AnalysisRecord, error)
 	ListUser(ctx context.Context, userID string, limit, offset int) ([]models.AnalysisRecord, error)
 	DeleteUser(ctx context.Context, userID, requestID string) error
+	PruneOlderThan(ctx context.Context, cutoff time.Time) (int, error)
 }
 
 type BookmarkRepository interface {
@@ -135,6 +137,25 @@ func (r *InMemoryRepository) DeleteUser(ctx context.Context, userID, requestID s
 		}
 	}
 	return ErrNotFound
+}
+
+func (r *InMemoryRepository) PruneOlderThan(ctx context.Context, cutoff time.Time) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	pruned := 0
+	retained := []models.AnalysisRecord{}
+	for _, rec := range r.records {
+		if rec.CreatedAt.Before(cutoff) {
+			pruned++
+		} else {
+			retained = append(retained, rec)
+		}
+	}
+	r.records = retained
+	return pruned, nil
 }
 
 func (r *InMemoryRepository) SaveBookmark(ctx context.Context, b models.Bookmark) error {

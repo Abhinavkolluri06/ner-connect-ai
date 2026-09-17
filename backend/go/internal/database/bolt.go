@@ -159,6 +159,47 @@ func (r *BoltRepository) DeleteUser(ctx context.Context, userID, requestID strin
 	})
 }
 
+func (r *BoltRepository) PruneOlderThan(ctx context.Context, cutoff time.Time) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	pruned := 0
+	err := r.db.Update(func(tx *bolt.Tx) error {
+		orderB := tx.Bucket(orderBucket)
+		recordsB := tx.Bucket(recordsBucket)
+		c := orderB.Cursor()
+		var keysToDelete [][]byte
+		var recordIDs [][]byte
+		for k, id := c.First(); k != nil; k, id = c.Next() {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			raw := recordsB.Get(id)
+			if raw == nil {
+				keysToDelete = append(keysToDelete, append([]byte(nil), k...))
+				continue
+			}
+			var rec models.AnalysisRecord
+			if err := json.Unmarshal(raw, &rec); err != nil {
+				continue
+			}
+			if rec.CreatedAt.Before(cutoff) {
+				keysToDelete = append(keysToDelete, append([]byte(nil), k...))
+				recordIDs = append(recordIDs, append([]byte(nil), id...))
+			}
+		}
+		for _, k := range keysToDelete {
+			_ = orderB.Delete(k)
+		}
+		for _, id := range recordIDs {
+			_ = recordsB.Delete(id)
+			pruned++
+		}
+		return nil
+	})
+	return pruned, err
+}
+
 func (r *BoltRepository) SaveBookmark(ctx context.Context, b models.Bookmark) error {
 	if err := ctx.Err(); err != nil {
 		return err

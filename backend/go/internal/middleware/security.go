@@ -2,12 +2,14 @@ package middleware
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -102,38 +104,131 @@ func Authenticate(token string, next http.Handler) http.Handler {
 }
 
 func parseAndValidateJWT(rawToken string) (userID string, expired bool, ok bool) {
+	return ValidateSupabaseJWT(
+		rawToken,
+		os.Getenv("SUPABASE_JWT_SECRET"),
+		os.Getenv("SUPABASE_JWT_ISSUER"),
+		os.Getenv("SUPABASE_JWT_AUDIENCE"),
+	)
+}
+
+// ValidateSupabaseJWT parses and validates a Supabase user access JWT according to
+// Supabase/RFC 7519 specifications: header algorithm, signature verification (HMAC-SHA256),
+// expiration, audience, issuer, and subject claims.
+func ValidateSupabaseJWT(rawToken, secret, expectedIssuer, expectedAudience string) (userID string, expired bool, ok bool) {
 	parts := strings.Split(rawToken, ".")
 	if len(parts) != 3 {
 		return "", false, false
 	}
-	payloadSegment := parts[1]
-	// Standard raw url decoding with padding compensation if needed
-	switch len(payloadSegment) % 4 {
-	case 2:
-		payloadSegment += "=="
-	case 3:
-		payloadSegment += "="
+
+	headerBytes, err := decodeBase64URL(parts[0])
+	if err != nil {
+		return "", false, false
 	}
-	payloadBytes, err := base64.URLEncoding.DecodeString(payloadSegment)
+	var header struct {
+		Alg string `json:"alg"`
+		Typ string `json:"typ"`
+	}
+	if err := json.Unmarshal(headerBytes, &header); err != nil {
+		return "", false, false
+	}
+	if strings.EqualFold(header.Alg, "none") || header.Alg == "" {
+		return "", false, false
+	}
+
+	payloadBytes, err := decodeBase64URL(parts[1])
 	if err != nil {
 		return "", false, false
 	}
 	var claims struct {
 		Sub string  `json:"sub"`
 		Exp float64 `json:"exp"`
+		Nbf float64 `json:"nbf"`
 		Iss string  `json:"iss"`
 		Aud any     `json:"aud"`
 	}
 	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
 		return "", false, false
 	}
-	if claims.Exp > 0 && time.Now().UTC().Unix() > int64(claims.Exp) {
+
+	now := time.Now().UTC().Unix()
+	if claims.Exp > 0 && now > int64(claims.Exp) {
 		return claims.Sub, true, false
+	}
+	if claims.Nbf > 0 && now < int64(claims.Nbf) {
+		return "", false, false
 	}
 	if claims.Sub == "" {
 		return "", false, false
 	}
+
+	// Validate audience
+	if expectedAudience != "" {
+		if !matchAudience(claims.Aud, expectedAudience) {
+			return "", false, false
+		}
+	} else if claims.Aud != nil {
+		if !matchAudience(claims.Aud, "authenticated") {
+			return "", false, false
+		}
+	}
+
+	// Validate issuer
+	if expectedIssuer != "" {
+		if claims.Iss != expectedIssuer {
+			return "", false, false
+		}
+	}
+
+	// Cryptographic signature verification with HMAC-SHA256 when secret is configured
+	if secret != "" {
+		if header.Alg != "HS256" {
+			return "", false, false
+		}
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte(parts[0] + "." + parts[1]))
+		expectedSig := mac.Sum(nil)
+
+		sigBytes, err := decodeBase64URL(parts[2])
+		if err != nil || subtle.ConstantTimeCompare(expectedSig, sigBytes) != 1 {
+			return "", false, false
+		}
+	}
+
 	return claims.Sub, false, true
+}
+
+func decodeBase64URL(segment string) ([]byte, error) {
+	switch len(segment) % 4 {
+	case 2:
+		segment += "=="
+	case 3:
+		segment += "="
+	}
+	return base64.URLEncoding.DecodeString(segment)
+}
+
+func matchAudience(rawAud any, expected string) bool {
+	if expected == "" {
+		return true
+	}
+	switch v := rawAud.(type) {
+	case string:
+		return v == expected
+	case []any:
+		for _, item := range v {
+			if s, ok := item.(string); ok && s == expected {
+				return true
+			}
+		}
+	case []string:
+		for _, s := range v {
+			if s == expected {
+				return true
+			}
+		}
+	}
+	return false
 }
 func LimitConcurrent(max int, timeout time.Duration, next http.Handler) http.Handler {
 	if max < 1 {

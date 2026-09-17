@@ -140,6 +140,14 @@ func (r *PostgresRepository) DeleteUser(ctx context.Context, userID, requestID s
 	return err
 }
 
+func (r *PostgresRepository) PruneOlderThan(ctx context.Context, cutoff time.Time) (int, error) {
+	tag, err := r.pool.Exec(ctx, "DELETE FROM ner_analyses WHERE created_at < $1", cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 func (r *PostgresRepository) SaveBookmark(ctx context.Context, b models.Bookmark) error {
 	bytes, err := json.Marshal(b)
 	if err != nil {

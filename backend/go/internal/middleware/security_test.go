@@ -1,6 +1,9 @@
 package middleware
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -104,3 +107,66 @@ func TestUserAuthenticationAndJWT(t *testing.T) {
 		t.Fatalf("expected TOKEN_EXPIRED error code, got %s", rec.Body.String())
 	}
 }
+
+func TestSupabaseJWTSignatureAndClaims(t *testing.T) {
+	secret := "super-secret-supabase-jwt-key-for-test-32bytes!"
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	claims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user-uuid-123","iss":"https://xyz.supabase.co/auth/v1","aud":"authenticated","exp":4102444800}`))
+	unsigned := header + "." + claims
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(unsigned))
+	validSig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	validToken := unsigned + "." + validSig
+
+	// 1. Valid token with matching secret, issuer, audience
+	uid, expired, ok := ValidateSupabaseJWT(validToken, secret, "https://xyz.supabase.co/auth/v1", "authenticated")
+	if !ok || expired || uid != "user-uuid-123" {
+		t.Fatalf("expected valid token, got uid=%s, expired=%v, ok=%v", uid, expired, ok)
+	}
+
+	// 2. Tampered signature
+	_, _, ok = ValidateSupabaseJWT(unsigned+".invalidsignature", secret, "", "")
+	if ok {
+		t.Fatal("expected signature mismatch rejection")
+	}
+
+	// 3. Wrong secret
+	_, _, ok = ValidateSupabaseJWT(validToken, "different-wrong-secret", "", "")
+	if ok {
+		t.Fatal("expected wrong secret rejection")
+	}
+
+	// 4. Algorithm none attack
+	noneHeader := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
+	noneToken := noneHeader + "." + claims + "."
+	_, _, ok = ValidateSupabaseJWT(noneToken, "", "", "")
+	if ok {
+		t.Fatal("expected algorithm none rejection")
+	}
+
+	// 5. Wrong audience
+	_, _, ok = ValidateSupabaseJWT(validToken, secret, "", "admin-only")
+	if ok {
+		t.Fatal("expected wrong audience rejection")
+	}
+
+	// 6. Wrong issuer
+	_, _, ok = ValidateSupabaseJWT(validToken, secret, "https://wrong.supabase.co", "")
+	if ok {
+		t.Fatal("expected wrong issuer rejection")
+	}
+
+	// 7. Expired token
+	pastClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user-uuid-123","iss":"https://xyz.supabase.co/auth/v1","aud":"authenticated","exp":1000}`))
+	pastUnsigned := header + "." + pastClaims
+	mac2 := hmac.New(sha256.New, []byte(secret))
+	mac2.Write([]byte(pastUnsigned))
+	pastSig := base64.RawURLEncoding.EncodeToString(mac2.Sum(nil))
+	pastToken := pastUnsigned + "." + pastSig
+	uid, expired, ok = ValidateSupabaseJWT(pastToken, secret, "", "")
+	if !expired || ok {
+		t.Fatalf("expected expired=true, ok=false, got expired=%v, ok=%v", expired, ok)
+	}
+}
+
