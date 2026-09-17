@@ -10,6 +10,7 @@ import (
 	"github.com/ner-connect-ai/backend-go/internal/database"
 	"github.com/ner-connect-ai/backend-go/internal/features"
 	"github.com/ner-connect-ai/backend-go/internal/intelligence"
+	"github.com/ner-connect-ai/backend-go/internal/middleware"
 	"github.com/ner-connect-ai/backend-go/internal/models"
 	"github.com/ner-connect-ai/backend-go/internal/routing"
 	"github.com/ner-connect-ai/backend-go/internal/scoring"
@@ -146,7 +147,32 @@ func (s *Service) Analyze(ctx context.Context, requestID string, req models.Anal
 	}
 	s.Logger.Info("scoring completed", "request_id", requestID)
 	s.Logger.Info("ranking completed", "request_id", requestID, "recommended_route_id", ranked[0].RouteID)
-	mode := "live"
+
+	// Determine precise active intelligence mode
+	mode := "live_heuristic"
+	isDemo := len(candidates) > 0 && candidates[0].Data.RoutingSource == "demo"
+	if fallbackUsed {
+		mode = "go_fallback"
+	} else if isDemo {
+		mode = "demo"
+	} else {
+		hasML := false
+		for _, r := range ranked {
+			if r.ModelMode == "ml" {
+				hasML = true
+				break
+			}
+		}
+		if hasML {
+			mode = "live_ml"
+		} else {
+			mode = "live_heuristic"
+		}
+	}
+	if weatherFailed && !fallbackUsed && !isDemo {
+		mode = "partial"
+	}
+
 	warnings := []string{}
 	warnings = append(warnings, "Planning estimates only: no calibrated hazard probability, clearance certificate or guaranteed safe route. Confirm local conditions before travel.")
 	if len(ranked) == 1 {
@@ -156,8 +182,7 @@ func (s *Service) Analyze(ctx context.Context, requestID string, req models.Anal
 		warnings = append(warnings, "Excluded route: "+why)
 	}
 	if fallbackUsed {
-		mode = "fallback"
-		warnings = append(warnings, "Heuristic fallback used because intelligence was unavailable or source features were incomplete; inspect each route's model_mode and data_quality.")
+		warnings = append(warnings, "Go fallback intelligence active: Python intelligence service was unreachable or rejected inputs. Heuristic estimate used.")
 	}
 	if weatherFailed {
 		warnings = append(warnings, "Live weather data was unavailable for one or more routes; available route features were used.")
@@ -165,15 +190,35 @@ func (s *Service) Analyze(ctx context.Context, requestID string, req models.Anal
 	if err := ctx.Err(); err != nil {
 		return models.AnalyzeResponse{}, err
 	}
-	resp := models.AnalyzeResponse{RequestID: requestID, RecommendedRouteID: ranked[0].RouteID, IntelligenceMode: mode, Routes: ranked, Warnings: warnings, GeneratedAt: time.Now().UTC(), ScoringVersion: "2.0"}
+
+	userID := middleware.UserIDFromContext(ctx)
+	resp := models.AnalyzeResponse{
+		SchemaVersion:         "2.0",
+		RequestID:             requestID,
+		RecommendedRouteID:    ranked[0].RouteID,
+		IntelligenceMode:      mode,
+		Routes:                ranked,
+		RecommendationReasons: ranked[0].RecommendationReasons,
+		Warnings:              warnings,
+		GeneratedAt:           time.Now().UTC(),
+		ScoringVersion:        "2.0",
+		OwnerUserID:           userID,
+	}
 	if s.Repository != nil {
 		resp.Persisted = true
-		if err := s.Repository.Save(ctx, models.AnalysisRecord{RequestID: requestID, Request: req, Response: resp, CreatedAt: time.Now().UTC()}); err != nil {
+		record := models.AnalysisRecord{
+			RequestID:   requestID,
+			OwnerUserID: userID,
+			Request:     req,
+			Response:    resp,
+			CreatedAt:   time.Now().UTC(),
+		}
+		if err := s.Repository.Save(ctx, record); err != nil {
 			s.Logger.Warn("analysis persistence failed", "request_id", requestID, "error", err)
 			resp.Persisted = false
 			resp.Warnings = append(resp.Warnings, "Analysis completed but could not be saved to history.")
 		}
 	}
-	s.Logger.Info("response returned", "request_id", requestID)
+	s.Logger.Info("response returned", "request_id", requestID, "engine_mode", mode)
 	return resp, nil
 }

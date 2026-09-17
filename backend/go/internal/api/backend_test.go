@@ -63,13 +63,14 @@ func TestSingleRouteAcceptedAndMissingFeaturesBypassML(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest("POST", "/api/v1/routes/analyze", bytes.NewReader(validBody())))
 	var result models.AnalyzeResponse
 	json.Unmarshal(rec.Body.Bytes(), &result)
-	if rec.Code != 200 || len(result.Routes) != 1 || result.IntelligenceMode != "fallback" || spy.called {
+	if rec.Code != 200 || len(result.Routes) != 1 || result.IntelligenceMode != "go_fallback" || spy.called {
 		t.Fatalf("unexpected incomplete-feature handling %d %s", rec.Code, rec.Body.String())
 	}
 }
 
 type spyIntelligence struct{ called bool }
 
+func (p *spyIntelligence) Healthy(context.Context) bool { return true }
 func (p *spyIntelligence) AnalyzeRisk(context.Context, models.RiskRequest) (models.RiskResponse, error) {
 	p.called = true
 	return models.RiskResponse{}, errors.New("should not call")

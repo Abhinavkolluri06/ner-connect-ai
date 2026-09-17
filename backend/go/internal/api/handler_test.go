@@ -48,7 +48,7 @@ func TestAnalyzeSuccess(t *testing.T) {
 	if out.RequestID == "" || rec.Header().Get("X-Request-ID") == "" {
 		t.Fatal("missing request ID")
 	}
-	if len(out.Routes) != 3 || out.RecommendedRouteID == "" || out.IntelligenceMode != "live" {
+	if len(out.Routes) != 3 || out.RecommendedRouteID == "" || (out.IntelligenceMode != "demo" && out.IntelligenceMode != "live_heuristic") {
 		t.Fatalf("unexpected response %+v", out)
 	}
 	for _, r := range out.Routes {
@@ -66,7 +66,7 @@ func TestAnalyzeFallback(t *testing.T) {
 	}
 	var out models.AnalyzeResponse
 	_ = json.NewDecoder(rec.Body).Decode(&out)
-	if out.IntelligenceMode != "fallback" || len(out.Warnings) == 0 || out.RecommendedRouteID == "" {
+	if out.IntelligenceMode != "go_fallback" || len(out.Warnings) == 0 || out.RecommendedRouteID == "" {
 		t.Fatalf("unexpected fallback response %+v", out)
 	}
 }

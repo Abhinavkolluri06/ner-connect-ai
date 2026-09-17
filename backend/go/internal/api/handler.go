@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"math"
@@ -44,10 +45,17 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /health/ready", h.ready)
 	mux.HandleFunc("POST /api/v1/routes/analyze", h.analyze)
 	mux.HandleFunc("POST /api/v1/routes/compare", h.compare)
+	mux.HandleFunc("POST /api/v1/tools/routes/compare-supplied", h.compare)
 	mux.HandleFunc("GET /api/v1/locations", h.locations)
 	mux.HandleFunc("POST /api/v1/locations/{id}/accessibility", h.analyze)
 	mux.HandleFunc("GET /api/v1/analyses", h.history)
 	mux.HandleFunc("GET /api/v1/analyses/{id}", h.analysisRecord)
+	mux.HandleFunc("DELETE /api/v1/analyses/{id}", h.deleteAnalysisRecord)
+	mux.HandleFunc("POST /api/v1/bookmarks", h.saveBookmark)
+	mux.HandleFunc("GET /api/v1/bookmarks", h.listBookmarks)
+	mux.HandleFunc("GET /api/v1/bookmarks/{id}", h.getBookmark)
+	mux.HandleFunc("DELETE /api/v1/bookmarks/{id}", h.deleteBookmark)
+	mux.HandleFunc("POST /api/v1/bookmarks/{id}/recalculate", h.recalculateBookmark)
 	mux.HandleFunc("GET /api/v1/openapi.json", h.openapi)
 	return mux
 }
@@ -103,7 +111,13 @@ func (h *Handler) analyze(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "INVALID_ROUTE_REQUEST", msg, id)
 		return
 	}
-	resp, err := h.Service.Analyze(r.Context(), id, req)
+	ctx := r.Context()
+	if middleware.UserIDFromContext(ctx) == "" {
+		if uid := middleware.UserIDFrom(r); uid != "" {
+			ctx = middleware.WithUserID(ctx, uid)
+		}
+	}
+	resp, err := h.Service.Analyze(ctx, id, req)
 	if err != nil {
 		h.Logger.Error("route analysis failed", "request_id", id, "error", err)
 		code := "INTERNAL_ERROR"
@@ -179,6 +193,7 @@ func (h *Handler) locations(w http.ResponseWriter, r *http.Request) {
 }
 func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
 	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
 	repo, ok := h.Repository.(database.HistoryRepository)
 	if !ok {
 		writeError(w, 503, "HISTORY_UNAVAILABLE", "History storage is unavailable.", id)
@@ -200,27 +215,41 @@ func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "INVALID_QUERY", "offset must be 0..10000.", id)
 		return
 	}
-	records, err := repo.List(r.Context(), limit, offset)
+	records, err := repo.ListUser(r.Context(), userID, limit, offset)
 	if err != nil {
 		writeError(w, 503, "HISTORY_UNAVAILABLE", "Could not read history.", id)
 		return
 	}
 	summaries := []map[string]any{}
 	for _, v := range records {
-		summaries = append(summaries, map[string]any{"request_id": v.RequestID, "created_at": v.CreatedAt, "request": v.Request, "recommended_route_id": v.Response.RecommendedRouteID, "intelligence_mode": v.Response.IntelligenceMode, "route_count": len(v.Response.Routes)})
+		summaries = append(summaries, map[string]any{
+			"request_id":           v.RequestID,
+			"created_at":           v.CreatedAt,
+			"owner_user_id":        v.OwnerUserID,
+			"request":              v.Request,
+			"recommended_route_id": v.Response.RecommendedRouteID,
+			"intelligence_mode":    v.Response.IntelligenceMode,
+			"route_count":          len(v.Response.Routes),
+		})
 	}
 	writeJSON(w, 200, map[string]any{"analyses": summaries, "limit": limit, "offset": offset, "count": len(summaries)})
 }
+
 func (h *Handler) analysisRecord(w http.ResponseWriter, r *http.Request) {
 	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
 	repo, ok := h.Repository.(database.HistoryRepository)
 	if !ok {
 		writeError(w, 503, "HISTORY_UNAVAILABLE", "History storage is unavailable.", id)
 		return
 	}
-	record, err := repo.Get(r.Context(), r.PathValue("id"))
+	record, err := repo.GetUser(r.Context(), userID, r.PathValue("id"))
 	if errors.Is(err, database.ErrNotFound) {
 		writeError(w, 404, "ANALYSIS_NOT_FOUND", "Analysis not found.", id)
+		return
+	}
+	if errors.Is(err, database.ErrUnauthorized) {
+		writeError(w, 403, "FORBIDDEN", "You do not have permission to view this analysis.", id)
 		return
 	}
 	if err != nil {
@@ -229,6 +258,263 @@ func (h *Handler) analysisRecord(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, record)
 }
+
+func (h *Handler) deleteAnalysisRecord(w http.ResponseWriter, r *http.Request) {
+	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
+	repo, ok := h.Repository.(database.HistoryRepository)
+	if !ok {
+		writeError(w, 503, "HISTORY_UNAVAILABLE", "History storage is unavailable.", id)
+		return
+	}
+	targetID := r.PathValue("id")
+	err := repo.DeleteUser(r.Context(), userID, targetID)
+	if errors.Is(err, database.ErrNotFound) {
+		writeError(w, 404, "ANALYSIS_NOT_FOUND", "Analysis not found.", id)
+		return
+	}
+	if errors.Is(err, database.ErrUnauthorized) {
+		writeError(w, 403, "FORBIDDEN", "You do not have permission to delete this analysis.", id)
+		return
+	}
+	if err != nil {
+		writeError(w, 503, "DELETE_FAILED", "Could not delete analysis.", id)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"status": "deleted", "analysis_id": targetID})
+}
+
+func (h *Handler) saveBookmark(w http.ResponseWriter, r *http.Request) {
+	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
+	bookmarkRepo, ok := h.Repository.(database.BookmarkRepository)
+	historyRepo, histOK := h.Repository.(database.HistoryRepository)
+	if !ok || !histOK {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Bookmark storage is unavailable.", id)
+		return
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	var req models.SaveBookmarkRequest
+	if err := dec.Decode(&req); err != nil {
+		writeError(w, 400, "INVALID_BOOKMARK_REQUEST", "Invalid JSON request body.", id)
+		return
+	}
+	if req.AssessmentID == "" {
+		writeError(w, 400, "INVALID_BOOKMARK_REQUEST", "assessment_id is required.", id)
+		return
+	}
+	analysis, err := historyRepo.GetUser(r.Context(), userID, req.AssessmentID)
+	if errors.Is(err, database.ErrNotFound) {
+		writeError(w, 404, "ANALYSIS_NOT_FOUND", "Referenced assessment not found.", id)
+		return
+	}
+	if errors.Is(err, database.ErrUnauthorized) {
+		writeError(w, 403, "FORBIDDEN", "You do not have permission to bookmark this assessment.", id)
+		return
+	}
+	if err != nil {
+		writeError(w, 500, "DATABASE_ERROR", "Failed to retrieve assessment.", id)
+		return
+	}
+
+	selectedRouteID := req.SelectedRouteID
+	if selectedRouteID == "" {
+		selectedRouteID = analysis.Response.RecommendedRouteID
+	}
+	var selectedRoute *models.ScoredRoute
+	for i := range analysis.Response.Routes {
+		if analysis.Response.Routes[i].RouteID == selectedRouteID {
+			rCopy := analysis.Response.Routes[i]
+			selectedRoute = &rCopy
+			break
+		}
+	}
+	if selectedRoute == nil && len(analysis.Response.Routes) > 0 {
+		rCopy := analysis.Response.Routes[0]
+		selectedRoute = &rCopy
+		selectedRouteID = rCopy.RouteID
+	}
+	if selectedRoute == nil {
+		writeError(w, 400, "INVALID_ROUTE", "No eligible route in assessment to bookmark.", id)
+		return
+	}
+
+	bmID := fmt.Sprintf("bm-%d", time.Now().UnixNano())
+	now := time.Now().UTC()
+	bookmark := models.Bookmark{
+		BookmarkID:                  bmID,
+		OwnerUserID:                 userID,
+		AssessmentID:                analysis.RequestID,
+		SelectedRouteID:             selectedRouteID,
+		OriginSummary:               analysis.Request.Origin,
+		DestinationSummary:          analysis.Request.Destination,
+		RouteType:                   analysis.Request.Vehicle,
+		DistanceKM:                  selectedRoute.DistanceKM,
+		ETAMinutes:                  selectedRoute.ETAMinutes,
+		RiskLevel:                   selectedRoute.RiskLevel,
+		AssessedAt:                  analysis.Response.GeneratedAt,
+		SavedAt:                     now,
+		ScoringVersion:              analysis.Response.ScoringVersion,
+		SnapshotOrRecalculateStatus: "snapshot_saved",
+		Snapshot:                    selectedRoute,
+		Request:                     analysis.Request,
+	}
+
+	if err := bookmarkRepo.SaveBookmark(r.Context(), bookmark); err != nil {
+		h.Logger.Error("save bookmark failed", "error", err)
+		writeError(w, 500, "DATABASE_ERROR", "Could not save bookmark.", id)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, bookmark)
+}
+
+func (h *Handler) listBookmarks(w http.ResponseWriter, r *http.Request) {
+	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
+	bookmarkRepo, ok := h.Repository.(database.BookmarkRepository)
+	if !ok {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Bookmark storage is unavailable.", id)
+		return
+	}
+	limit, offset := 20, 0
+	var err error
+	if v := r.URL.Query().Get("limit"); v != "" {
+		limit, err = strconv.Atoi(v)
+	}
+	if err != nil || limit < 1 || limit > 50 {
+		writeError(w, 400, "INVALID_QUERY", "limit must be 1..50.", id)
+		return
+	}
+	if v := r.URL.Query().Get("offset"); v != "" {
+		offset, err = strconv.Atoi(v)
+	}
+	if err != nil || offset < 0 || offset > 10000 {
+		writeError(w, 400, "INVALID_QUERY", "offset must be 0..10000.", id)
+		return
+	}
+	records, err := bookmarkRepo.ListBookmarks(r.Context(), userID, limit, offset)
+	if err != nil {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Could not read bookmarks.", id)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"bookmarks": records, "limit": limit, "offset": offset, "count": len(records)})
+}
+
+func (h *Handler) getBookmark(w http.ResponseWriter, r *http.Request) {
+	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
+	bookmarkRepo, ok := h.Repository.(database.BookmarkRepository)
+	if !ok {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Bookmark storage is unavailable.", id)
+		return
+	}
+	bm, err := bookmarkRepo.GetBookmark(r.Context(), userID, r.PathValue("id"))
+	if errors.Is(err, database.ErrNotFound) {
+		writeError(w, 404, "BOOKMARK_NOT_FOUND", "Bookmark not found.", id)
+		return
+	}
+	if errors.Is(err, database.ErrUnauthorized) {
+		writeError(w, 403, "FORBIDDEN", "You do not have permission to view this bookmark.", id)
+		return
+	}
+	if err != nil {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Could not read bookmark.", id)
+		return
+	}
+	writeJSON(w, 200, bm)
+}
+
+func (h *Handler) deleteBookmark(w http.ResponseWriter, r *http.Request) {
+	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
+	bookmarkRepo, ok := h.Repository.(database.BookmarkRepository)
+	if !ok {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Bookmark storage is unavailable.", id)
+		return
+	}
+	bmID := r.PathValue("id")
+	err := bookmarkRepo.DeleteBookmark(r.Context(), userID, bmID)
+	if errors.Is(err, database.ErrNotFound) {
+		writeError(w, 404, "BOOKMARK_NOT_FOUND", "Bookmark not found.", id)
+		return
+	}
+	if errors.Is(err, database.ErrUnauthorized) {
+		writeError(w, 403, "FORBIDDEN", "You do not have permission to delete this bookmark.", id)
+		return
+	}
+	if err != nil {
+		writeError(w, 503, "DELETE_FAILED", "Could not delete bookmark.", id)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"status": "deleted", "bookmark_id": bmID})
+}
+
+func (h *Handler) recalculateBookmark(w http.ResponseWriter, r *http.Request) {
+	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
+	bookmarkRepo, ok := h.Repository.(database.BookmarkRepository)
+	if !ok {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Bookmark storage is unavailable.", id)
+		return
+	}
+	bmID := r.PathValue("id")
+	bm, err := bookmarkRepo.GetBookmark(r.Context(), userID, bmID)
+	if errors.Is(err, database.ErrNotFound) {
+		writeError(w, 404, "BOOKMARK_NOT_FOUND", "Bookmark not found.", id)
+		return
+	}
+	if errors.Is(err, database.ErrUnauthorized) {
+		writeError(w, 403, "FORBIDDEN", "You do not have permission to recalculate this bookmark.", id)
+		return
+	}
+	if err != nil {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Could not read bookmark.", id)
+		return
+	}
+
+	recalcID := fmt.Sprintf("recalc-%d", time.Now().UnixNano())
+	analysis, err := h.Service.Analyze(r.Context(), recalcID, bm.Request)
+	if err != nil {
+		h.Logger.Error("bookmark recalculation failed", "error", err, "bookmark_id", bmID)
+		writeError(w, 500, "RECALCULATION_FAILED", "Could not recalculate route with current data.", id)
+		return
+	}
+
+	selectedRouteID := bm.SelectedRouteID
+	var selectedRoute *models.ScoredRoute
+	for i := range analysis.Routes {
+		if analysis.Routes[i].RouteID == selectedRouteID {
+			rCopy := analysis.Routes[i]
+			selectedRoute = &rCopy
+			break
+		}
+	}
+	if selectedRoute == nil && len(analysis.Routes) > 0 {
+		rCopy := analysis.Routes[0]
+		selectedRoute = &rCopy
+		selectedRouteID = rCopy.RouteID
+	}
+
+	if selectedRoute != nil {
+		bm.SelectedRouteID = selectedRouteID
+		bm.DistanceKM = selectedRoute.DistanceKM
+		bm.ETAMinutes = selectedRoute.ETAMinutes
+		bm.RiskLevel = selectedRoute.RiskLevel
+		bm.AssessedAt = analysis.GeneratedAt
+		bm.SnapshotOrRecalculateStatus = "recalculated_live"
+		bm.ScoringVersion = analysis.ScoringVersion
+		bm.Snapshot = selectedRoute
+		_ = bookmarkRepo.SaveBookmark(r.Context(), bm)
+	}
+
+	writeJSON(w, 200, map[string]any{
+		"bookmark": bm,
+		"analysis": analysis,
+	})
+}
+
 func oneOf(v string, allowed ...string) bool {
 	for _, a := range allowed {
 		if v == a {
@@ -257,15 +543,28 @@ func (h *Handler) live(w http.ResponseWriter, _ *http.Request) {
 func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 750*time.Millisecond)
 	defer cancel()
-	routingOK := h.Routing.Healthy(ctx)
+	routingOK := h.Routing != nil && h.Routing.Healthy(ctx)
 	repoOK := h.Repository == nil || h.Repository.Healthy(ctx)
+	intelOK := h.Service != nil && h.Service.Intelligence != nil && h.Service.Intelligence.Healthy(ctx)
 	status := http.StatusOK
 	state := "ready"
 	if !routingOK || !repoOK {
 		status = http.StatusServiceUnavailable
 		state = "not_ready"
 	}
-	writeJSON(w, status, map[string]any{"status": state, "dependencies": map[string]any{"routing": routingOK, "repository": repoOK, "intelligence": "optional_with_fallback", "weather": "degraded_operation_supported"}})
+	intelStatus := "healthy"
+	if !intelOK {
+		intelStatus = "degraded_fallback_active"
+	}
+	writeJSON(w, status, map[string]any{
+		"status": state,
+		"dependencies": map[string]any{
+			"routing":      routingOK,
+			"repository":   repoOK,
+			"intelligence": intelStatus,
+			"weather":      "degraded_operation_supported",
+		},
+	})
 }
 func writeError(w http.ResponseWriter, status int, code, message, id string) {
 	writeJSON(w, status, apiError{Error: errorBody{Code: code, Message: message, RequestID: id}})
