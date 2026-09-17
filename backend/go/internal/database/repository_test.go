@@ -79,3 +79,131 @@ func TestPostgresIntegration(t *testing.T) {
 	defer r.pool.Exec(context.Background(), "DELETE FROM ner_analyses WHERE request_id IN ($1,$2,$3)", prefix+"-0", prefix+"-1", prefix+"-2")
 	exercise(t, r, prefix)
 }
+
+func TestUserIsolationAndBookmarks(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "bolt_user_test.db")
+	boltRepo, err := OpenBolt(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer boltRepo.Close()
+
+	inMemoryRepo := NewInMemoryRepository()
+
+	repos := []struct {
+		name     string
+		histRepo HistoryRepository
+		bmRepo   BookmarkRepository
+	}{
+		{"InMemory", inMemoryRepo, inMemoryRepo},
+		{"Bolt", boltRepo, boltRepo},
+	}
+
+	for _, tc := range repos {
+		t.Run(tc.name, func(t *testing.T) {
+			userA := "user-alice"
+			userB := "user-bob"
+
+			// Save analyses for User A and User B
+			recA := models.AnalysisRecord{
+				RequestID:   "req-a-1",
+				OwnerUserID: userA,
+				CreatedAt:   time.Now().UTC(),
+				Request:     models.AnalyzeRequest{Origin: "Guwahati", Destination: "Shillong"},
+			}
+			recB := models.AnalysisRecord{
+				RequestID:   "req-b-1",
+				OwnerUserID: userB,
+				CreatedAt:   time.Now().UTC().Add(time.Second),
+				Request:     models.AnalyzeRequest{Origin: "Silchar", Destination: "Agartala"},
+			}
+			if err := tc.histRepo.Save(ctx, recA); err != nil {
+				t.Fatalf("save recA: %v", err)
+			}
+			if err := tc.histRepo.Save(ctx, recB); err != nil {
+				t.Fatalf("save recB: %v", err)
+			}
+
+			// User A lists their analyses -> only sees recA
+			listA, err := tc.histRepo.ListUser(ctx, userA, 10, 0)
+			if err != nil || len(listA) != 1 || listA[0].RequestID != "req-a-1" {
+				t.Fatalf("User A list mismatch: len %d, err %v", len(listA), err)
+			}
+
+			// User B tries to read User A's record -> unauthorized
+			_, err = tc.histRepo.GetUser(ctx, userB, "req-a-1")
+			if !errors.Is(err, ErrUnauthorized) {
+				t.Fatalf("expected ErrUnauthorized when User B gets User A's record, got %v", err)
+			}
+
+			// User B tries to delete User A's record -> unauthorized
+			err = tc.histRepo.DeleteUser(ctx, userB, "req-a-1")
+			if !errors.Is(err, ErrUnauthorized) {
+				t.Fatalf("expected ErrUnauthorized when User B deletes User A's record, got %v", err)
+			}
+
+			// User A deletes their own record -> succeeds
+			if err := tc.histRepo.DeleteUser(ctx, userA, "req-a-1"); err != nil {
+				t.Fatalf("User A delete own record failed: %v", err)
+			}
+
+			// Verify recA is gone
+			_, err = tc.histRepo.Get(ctx, "req-a-1")
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("expected ErrNotFound for deleted recA, got %v", err)
+			}
+
+			// Bookmarks testing
+			bmA := models.Bookmark{
+				BookmarkID:         "bm-a-1",
+				OwnerUserID:        userA,
+				OriginSummary:      "Guwahati",
+				DestinationSummary: "Shillong",
+				SelectedRouteID:    "route-b",
+				SavedAt:            time.Now().UTC(),
+			}
+			bmB := models.Bookmark{
+				BookmarkID:         "bm-b-1",
+				OwnerUserID:        userB,
+				OriginSummary:      "Silchar",
+				DestinationSummary: "Agartala",
+				SelectedRouteID:    "route-a",
+				SavedAt:            time.Now().UTC().Add(time.Second),
+			}
+			if err := tc.bmRepo.SaveBookmark(ctx, bmA); err != nil {
+				t.Fatalf("save bmA: %v", err)
+			}
+			if err := tc.bmRepo.SaveBookmark(ctx, bmB); err != nil {
+				t.Fatalf("save bmB: %v", err)
+			}
+
+			// User A lists bookmarks -> only sees bmA
+			bmsA, err := tc.bmRepo.ListBookmarks(ctx, userA, 10, 0)
+			if err != nil || len(bmsA) != 1 || bmsA[0].BookmarkID != "bm-a-1" {
+				t.Fatalf("User A bookmarks mismatch: len %d, err %v", len(bmsA), err)
+			}
+
+			// User B cannot access User A's bookmark
+			_, err = tc.bmRepo.GetBookmark(ctx, userB, "bm-a-1")
+			if !errors.Is(err, ErrUnauthorized) {
+				t.Fatalf("expected ErrUnauthorized when User B gets User A's bookmark, got %v", err)
+			}
+
+			// User B cannot delete User A's bookmark
+			err = tc.bmRepo.DeleteBookmark(ctx, userB, "bm-a-1")
+			if !errors.Is(err, ErrUnauthorized) {
+				t.Fatalf("expected ErrUnauthorized when User B deletes User A's bookmark, got %v", err)
+			}
+
+			// User A deletes own bookmark
+			if err := tc.bmRepo.DeleteBookmark(ctx, userA, "bm-a-1"); err != nil {
+				t.Fatalf("User A delete bookmark: %v", err)
+			}
+			_, err = tc.bmRepo.GetBookmark(ctx, userA, "bm-a-1")
+			if !errors.Is(err, ErrNotFound) {
+				t.Fatalf("expected ErrNotFound for deleted bookmark, got %v", err)
+			}
+		})
+	}
+}
