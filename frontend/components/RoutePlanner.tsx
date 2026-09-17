@@ -496,6 +496,23 @@ export default function Dashboard() {
         throw insertError;
       }
 
+      // Authoritative sync to Go backend via trusted BFF proxy
+      if (result?.requestId) {
+        try {
+          await fetch("/api/v1/bookmarks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              assessment_id: result.requestId,
+              selected_route_id: selectedRoute.id,
+              name,
+            }),
+          });
+        } catch {
+          // non-blocking
+        }
+      }
+
       setBookmarkSaved(true);
 
       window.setTimeout(() => {
@@ -571,13 +588,32 @@ export default function Dashboard() {
                 </h2>
 
                 {result ? (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                    {
-                      result.routes
-                        .length
-                    }{" "}
-                    routes
-                  </span>
+                  <>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                      {result.routes.length} routes
+                    </span>
+                    {result.intelligenceMode ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          result.intelligenceMode === "live_ml"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : result.intelligenceMode === "go_fallback"
+                              ? "bg-amber-100 text-amber-800"
+                              : result.intelligenceMode === "demo"
+                                ? "bg-purple-100 text-purple-800"
+                                : "bg-blue-100 text-blue-800"
+                        }`}
+                      >
+                        {result.intelligenceMode === "live_ml"
+                          ? "Model-based estimate"
+                          : result.intelligenceMode === "go_fallback"
+                            ? "Go Fallback Active"
+                            : result.intelligenceMode === "demo"
+                              ? "Demonstration Scenario"
+                              : "Heuristic Estimate"}
+                      </span>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
 
@@ -598,6 +634,17 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
+
+            {result?.warnings && result.warnings.length > 0 ? (
+              <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+                <p className="font-semibold">Assessment Notices &amp; Limitations:</p>
+                <ul className="mt-0.5 list-disc pl-4 space-y-0.5 text-[11px]">
+                  {result.warnings.map((w, idx) => (
+                    <li key={idx}>{w}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <div className="h-[500px] w-full">
               <MapView
@@ -631,8 +678,12 @@ export default function Dashboard() {
                   : "Why this route?"
               }
               body={
+                result?.explanation ||
                 selectedRouteExplanation ||
                 "Run a route assessment to see the recommended corridor and the reasons behind the recommendation."
+              }
+              points={
+                result?.recommendationReasons?.map((r) => r.message) || []
               }
             />
 

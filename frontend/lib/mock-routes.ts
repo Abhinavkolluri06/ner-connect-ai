@@ -1,121 +1,75 @@
 import type {
   AccessibilityMetrics,
+  BackendAnalyzeResponse,
+  BackendScoredRoute,
   RouteOption,
   RouteRequest,
   RouteResponse,
 } from "./types";
 
 export const defaultRouteRequest: RouteRequest = {
-  origin: "",
-  destination: "",
+  origin: "Guwahati",
+  destination: "Shillong",
   vehicle: "Truck",
   cargo: "Medical Supplies",
   priority: "Emergency",
 };
 
-type MapApiRoute = {
-  id: string;
-  distanceKm: number;
-  durationMinutes: number;
-  coordinates: [number, number][];
-};
+export function formatEta(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const mins = Math.round(minutes % 60);
 
-type MapApiResponse = {
-  origin: {
-    displayName: string;
-  };
-  destination: {
-    displayName: string;
-  };
-  routes?: MapApiRoute[];
-  error?: string;
-};
-
-/*
- * Temporary demonstration risk generation.
- *
- * The real backend will eventually provide these values using
- * landslide, flood, weather, and road-condition data.
- *
- * This function intentionally supports any number of routes.
- */
-function createRisk(index: number) {
-  const baseRisk = 18 + ((index * 7) % 32);
-
-  return {
-    landslide: Math.min(90, baseRisk + 4),
-    flood: Math.min(90, baseRisk),
-    weather: Math.min(90, baseRisk + 8),
-    roadCondition: Math.min(90, baseRisk + 2),
-  };
+  if (hours === 0) {
+    return `${mins}m`;
+  }
+  return `${hours}h ${mins.toString().padStart(2, "0")}m`;
 }
 
-function createRouteOption(
-  route: MapApiRoute,
+function mapScoredRouteToOption(
+  route: BackendScoredRoute,
   index: number,
-  totalRoutes: number,
+  recommendedId: string,
 ): RouteOption {
-  const risks = createRisk(index);
-
-  const overallRisk = Math.round(
-    (risks.landslide +
-      risks.flood +
-      risks.weather +
-      risks.roadCondition) /
-      4,
-  );
-
-  const reliability = 100 - overallRisk;
-
-  const isRecommended =
-    totalRoutes === 1 || index === 0;
+  const isRecommended = route.route_id === recommendedId || index === 0;
+  const overallRisk = Math.round((1 - route.safety_score) * 100);
 
   let status: RouteOption["status"] = "alternate";
-  let reason = "Alternative road route";
-
   if (isRecommended) {
     status = "recommended";
-    reason =
-      "Best available balance of route distance and estimated disruption risk.";
-  } else if (overallRisk > 45) {
+  } else if (overallRisk > 45 || route.safety_score < 0.55) {
     status = "higher_risk";
-    reason =
-      "Higher estimated disruption risk compared with the recommended route.";
-  } else {
-    status = "alternate";
-    reason =
-      "Alternative road route with a different travel profile.";
   }
 
-  return {
-    id: route.id,
-    name: `Route ${index + 1}`,
-    corridor: "OSRM road corridor",
-    distanceKm: route.distanceKm,
-    etaMinutes: route.durationMinutes,
-    overallRisk,
-    reliability,
-    status,
-    reason,
-    risks,
-  };
-}
-
-function createAccessibility(
-  recommendedRoute: RouteOption,
-): AccessibilityMetrics {
-  const score = Math.max(
-    0,
-    Math.min(100, recommendedRoute.reliability),
+  // Convert GeoJSON coordinates [lon, lat] to Leaflet [lat, lon]
+  const leafletCoords = route.geojson?.coordinates?.map(
+    ([lon, lat]) => [lat, lon] as [number, number],
   );
 
   return {
-    score,
-    roadAccessibility: score,
-    essentialServicesProximity: 76,
-    terrainDifficulty: 100 - score,
-    notes:
-      "Accessibility assessment is currently using demonstration values and will be supplied by the backend assessment service.",
+    id: route.route_id,
+    name: isRecommended ? `Route ${index + 1} (Recommended)` : `Route ${index + 1}`,
+    corridor: route.policy_notes?.length ? route.policy_notes.join("; ") : "Evaluated Corridor",
+    distanceKm: Math.round(route.distance_km * 10) / 10,
+    etaMinutes: Math.round(route.eta_minutes),
+    overallRisk,
+    reliability: Math.round(route.reliability_percent),
+    status,
+    reason: route.reason || (route.recommendation_reasons?.[0]?.message ?? "Evaluated highway corridor"),
+    risks: {
+      landslide: Math.round(route.landslide_risk * 100),
+      flood: Math.round(route.flood_risk * 100),
+      weather: Math.round(route.weather_risk * 100),
+      roadCondition: Math.round(Math.max(0, 100 - route.road_quality_score)),
+    },
+    coordinates: leafletCoords,
+    geojson: route.geojson,
+    recommendationReasons: route.recommendation_reasons,
+    hazards: route.hazards,
+    riskLevel: route.risk_level,
+    modelMode: route.model_mode,
+    roadQualityScore: route.road_quality_score,
+    vehicleSuitability: route.vehicle_suitability,
+    policyNotes: route.policy_notes,
   };
 }
 
@@ -126,12 +80,10 @@ export async function fetchSafeRoutes(
   const destination = request.destination.trim();
 
   if (!origin || !destination) {
-    throw new Error(
-      "Origin and destination are required.",
-    );
+    throw new Error("Origin and destination are required.");
   }
 
-  const response = await fetch("/api/map-route", {
+  const response = await fetch("/api/v1/routes/analyze", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -139,75 +91,68 @@ export async function fetchSafeRoutes(
     body: JSON.stringify({
       origin,
       destination,
+      vehicle: request.vehicle,
+      cargo: request.cargo,
+      priority: request.priority,
     }),
   });
 
-  const data = (await response.json()) as MapApiResponse;
+  const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(
-      data.error ?? "Unable to calculate the road route.",
-    );
+    const errorMsg =
+      data?.error?.message ||
+      data?.message ||
+      "Unable to calculate route assessment.";
+    throw new Error(errorMsg);
   }
 
-  if (!data.routes?.length) {
-    throw new Error(
-      "No road routes were found between these locations.",
-    );
+  const analysis = data as BackendAnalyzeResponse;
+
+  if (!analysis.routes || analysis.routes.length === 0) {
+    throw new Error("No eligible routes returned by assessment service.");
   }
 
-  /*
-   * Important:
-   * We do not limit the number of routes here.
-   *
-   * Whatever number the routing API returns will be rendered
-   * by the frontend.
-   */
-  const routes = data.routes.map((route, index) =>
-    createRouteOption(
-      route,
-      index,
-      data.routes!.length,
-    ),
+  const routes: RouteOption[] = analysis.routes.map((r, idx) =>
+    mapScoredRouteToOption(r, idx, analysis.recommended_route_id),
   );
 
   const recommendedRoute =
-    routes.find(
-      (route) => route.status === "recommended",
-    ) ?? routes[0];
+    routes.find((r) => r.id === analysis.recommended_route_id) || routes[0];
 
-  const accessibility =
-    createAccessibility(recommendedRoute);
+  const accessScore = Math.round(
+    (analysis.routes[0]?.accessibility_score ?? 0.8) * 100,
+  );
 
-  let explanation: string;
+  const accessibility: AccessibilityMetrics = {
+    score: accessScore,
+    roadAccessibility: accessScore,
+    essentialServicesProximity: 75,
+    terrainDifficulty: Math.max(0, 100 - accessScore),
+    notes: `Intelligence mode: ${analysis.intelligence_mode} (scoring v${analysis.scoring_version}). Route is a decision-support recommendation, not a guaranteed safety clearance.`,
+  };
 
-  if (routes.length === 1) {
-    explanation =
-      "Only one road route was returned for these locations. The route shown is the primary available road route. Risk and reliability values are temporary demonstration values until the route assessment backend is connected.";
-  } else {
-    explanation =
-      `${routes.length} road routes were returned for the selected locations. The current recommendation uses temporary demonstration risk values; the final recommendation will be calculated by the route assessment backend using landslide, flood, weather, and road-condition data.`;
-  }
+  const primaryReason =
+    analysis.recommendation_reasons?.[0]?.message ||
+    recommendedRoute.reason ||
+    "Safest eligible corridor based on available hazard intelligence.";
 
   return {
-    origin: data.origin.displayName,
-    destination: data.destination.displayName,
+    origin,
+    destination,
     vehicle: request.vehicle,
     cargo: request.cargo,
     priority: request.priority,
-    generatedAt: new Date().toISOString(),
-    recommendedRouteId: recommendedRoute.id,
-    explanation,
+    generatedAt: analysis.generated_at || new Date().toISOString(),
+    recommendedRouteId: analysis.recommended_route_id,
+    explanation: primaryReason,
     routes,
     accessibility,
+    requestId: analysis.request_id,
+    schemaVersion: analysis.schema_version,
+    intelligenceMode: analysis.intelligence_mode,
+    recommendationReasons: analysis.recommendation_reasons,
+    warnings: analysis.warnings,
+    scoringVersion: analysis.scoring_version,
   };
-}
-
-export function formatEta(minutes: number) {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-
-  return `${hours}h ${mins
-    .toString()
-    .padStart(2, "0")}m`;
 }
