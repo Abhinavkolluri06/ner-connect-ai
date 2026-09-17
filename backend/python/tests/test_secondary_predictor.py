@@ -7,8 +7,15 @@ import numpy as np
 import pytest
 
 
+def legacy_path(subpath: str) -> Path:
+    p = Path(__file__).resolve().parents[3] / "legacy" / "synthetic_model_legacy" / subpath
+    if not p.exists():
+        p = Path(__file__).resolve().parents[2] / subpath
+    return p
+
+
 def predictor():
-    path = Path(__file__).resolve().parents[2] / "src/predict.py"
+    path = legacy_path("src/predict.py")
     spec = importlib.util.spec_from_file_location("secondary_predict", path)
     module = importlib.util.module_from_spec(spec)
     # Compile the inspected source without writing tracked upstream .pyc files.
@@ -101,7 +108,7 @@ def test_secondary_api_uses_threadpool_and_bounds(monkeypatch):
     fake = types.ModuleType("src.predict")
     fake.RouteReliabilityPredictor = predictor
     monkeypatch.setitem(sys.modules, "src.predict", fake)
-    path = Path(__file__).resolve().parents[2] / "app.py"
+    path = legacy_path("app.py")
     module = types.ModuleType("secondary_api_test")
     exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), module.__dict__)
     assert not inspect.iscoroutinefunction(module.predict_segment)
