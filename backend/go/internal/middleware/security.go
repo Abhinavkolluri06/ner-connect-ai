@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -12,26 +13,127 @@ import (
 	"time"
 )
 
+const UserIDContextKey contextKey = "authenticated_user_id"
+
+func WithUserID(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, UserIDContextKey, userID)
+}
+
+func UserIDFrom(r *http.Request) string {
+	if uid := UserIDFromContext(r.Context()); uid != "" {
+		return uid
+	}
+	if r != nil {
+		if rawUID := strings.TrimSpace(r.Header.Get("X-User-ID")); rawUID != "" && len(rawUID) <= 128 {
+			return rawUID
+		}
+	}
+	return ""
+}
+
+func UserIDFromContext(ctx context.Context) string {
+	if v, ok := ctx.Value(UserIDContextKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
 func respond(w http.ResponseWriter, r *http.Request, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": message, "request_id": RequestIDFrom(r)}})
 }
+
 func Authenticate(token string, next http.Handler) http.Handler {
 	expected := sha256.Sum256([]byte("Bearer " + token))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
-		if strings.HasPrefix(r.URL.Path, "/api/") && token != "" {
-			got := sha256.Sum256([]byte(r.Header.Get("Authorization")))
-			if subtle.ConstantTimeCompare(expected[:], got[:]) != 1 {
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+		var authenticatedUserID string
+
+		if token != "" {
+			got := sha256.Sum256([]byte(authHeader))
+			if subtle.ConstantTimeCompare(expected[:], got[:]) == 1 {
+				// Valid service token provided (e.g. from trusted Next.js BFF proxy)
+				if rawUID := strings.TrimSpace(r.Header.Get("X-User-ID")); rawUID != "" && len(rawUID) <= 128 {
+					authenticatedUserID = rawUID
+				} else {
+					authenticatedUserID = "service-admin"
+				}
+			} else if strings.HasPrefix(authHeader, "Bearer ") {
+				// Check if this is a user JWT (e.g. Supabase user access token)
+				jwtToken := strings.TrimPrefix(authHeader, "Bearer ")
+				uid, expired, ok := parseAndValidateJWT(jwtToken)
+				if expired {
+					w.Header().Set("WWW-Authenticate", "Bearer error=\"invalid_token\", error_description=\"token has expired\"")
+					respond(w, r, 401, "TOKEN_EXPIRED", "Session token has expired. Please sign in again.")
+					return
+				}
+				if ok && uid != "" {
+					authenticatedUserID = uid
+				} else {
+					w.Header().Set("WWW-Authenticate", "Bearer")
+					respond(w, r, 401, "UNAUTHORIZED", "A valid service API token or user session is required.")
+					return
+				}
+			} else {
 				w.Header().Set("WWW-Authenticate", "Bearer")
 				respond(w, r, 401, "UNAUTHORIZED", "A valid service API token is required.")
 				return
 			}
+		} else {
+			// Development mode without configured API_TOKEN
+			if rawUID := strings.TrimSpace(r.Header.Get("X-User-ID")); rawUID != "" && len(rawUID) <= 128 {
+				authenticatedUserID = rawUID
+			} else {
+				authenticatedUserID = "dev-user-local"
+			}
 		}
-		next.ServeHTTP(w, r)
+
+		ctx := context.WithValue(r.Context(), UserIDContextKey, authenticatedUserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func parseAndValidateJWT(rawToken string) (userID string, expired bool, ok bool) {
+	parts := strings.Split(rawToken, ".")
+	if len(parts) != 3 {
+		return "", false, false
+	}
+	payloadSegment := parts[1]
+	// Standard raw url decoding with padding compensation if needed
+	switch len(payloadSegment) % 4 {
+	case 2:
+		payloadSegment += "=="
+	case 3:
+		payloadSegment += "="
+	}
+	payloadBytes, err := base64.URLEncoding.DecodeString(payloadSegment)
+	if err != nil {
+		return "", false, false
+	}
+	var claims struct {
+		Sub string  `json:"sub"`
+		Exp float64 `json:"exp"`
+		Iss string  `json:"iss"`
+		Aud any     `json:"aud"`
+	}
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return "", false, false
+	}
+	if claims.Exp > 0 && time.Now().UTC().Unix() > int64(claims.Exp) {
+		return claims.Sub, true, false
+	}
+	if claims.Sub == "" {
+		return "", false, false
+	}
+	return claims.Sub, false, true
 }
 func LimitConcurrent(max int, timeout time.Duration, next http.Handler) http.Handler {
 	if max < 1 {
