@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -39,6 +40,11 @@ type Config struct {
 	FeedURL            string
 	APIToken           string
 	RequestTimeout     time.Duration
+	RoutingTimeout     time.Duration
+	WeatherTimeout     time.Duration
+	TerrainTimeout     time.Duration
+	FeedTimeout        time.Duration
+	DatabaseTimeout    time.Duration
 	MaxConcurrent      int
 }
 
@@ -110,7 +116,21 @@ func Load() (Config, error) {
 	if c.Environment == "production" && c.DemoMode {
 		return c, fmt.Errorf("production cannot use demo mode")
 	}
+	c.RoutingTimeout = time.Duration(envInt("ROUTING_TIMEOUT_SECONDS", 8)) * time.Second
+	c.WeatherTimeout = time.Duration(envInt("WEATHER_TIMEOUT_SECONDS", 5)) * time.Second
+	c.TerrainTimeout = time.Duration(envInt("TERRAIN_TIMEOUT_SECONDS", 5)) * time.Second
+	c.FeedTimeout = time.Duration(envInt("FEED_TIMEOUT_SECONDS", 5)) * time.Second
+	c.DatabaseTimeout = time.Duration(envInt("DATABASE_TIMEOUT_SECONDS", 5)) * time.Second
 	return c, nil
+}
+
+func envInt(k string, fallback int) int {
+	if v := os.Getenv(k); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return fallback
 }
 
 func env(k, fallback string) string {
@@ -128,4 +148,16 @@ func split(v string) []string {
 		}
 	}
 	return out
+}
+
+// BoundedContext derives a child context whose timeout is bounded by both
+// the specified target duration and any remaining parent context deadline.
+func BoundedContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining < timeout {
+			timeout = remaining
+		}
+	}
+	return context.WithTimeout(ctx, timeout)
 }

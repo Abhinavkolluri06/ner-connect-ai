@@ -2,8 +2,10 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"github.com/ner-connect-ai/backend-go/internal/circuit"
 	"github.com/ner-connect-ai/backend-go/internal/config"
 	"github.com/ner-connect-ai/backend-go/internal/database"
 	"github.com/ner-connect-ai/backend-go/internal/intelligence"
@@ -130,5 +132,85 @@ func TestHealthEndpoints(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s got %d", path, rec.Code)
 		}
+	}
+}
+
+func TestCircuitBreakerIntegrationAndReadiness(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	repo := database.NewInMemoryRepository()
+	eng := scoring.Engine{Normal: config.Weights{Safety: 1}, Emergency: config.Weights{Safety: 1}}
+	circuits := circuit.NewRegistry()
+
+	failingIntel := &spyIntelligence{} // fails on AnalyzeRisk
+	service := &Service{
+		Routing:      routing.DemoProvider{},
+		Weather:      weather.DemoProvider{},
+		Intelligence: failingIntel,
+		Fallback:     intelligence.HeuristicFallbackRiskProvider{},
+		Scoring:      eng,
+		Repository:   repo,
+		Logger:       logger,
+		Circuit:      circuits,
+	}
+	h := &Handler{
+		Service:         service,
+		Routing:         routing.DemoProvider{},
+		Weather:         weather.DemoProvider{},
+		Repository:      repo,
+		MaxRequestBytes: 1024,
+		Logger:          logger,
+	}
+	handler := middleware.RequestID(h.Routes())
+
+	// 1. Initial readiness should be 200 OK with CLOSED circuits
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health/ready", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	var readyResp map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &readyResp)
+	deps := readyResp["dependencies"].(map[string]any)
+	cbMap := deps["circuits"].(map[string]any)
+	if cbMap["intelligence"] != "CLOSED" {
+		t.Fatalf("expected intelligence circuit to be CLOSED, got %v", cbMap["intelligence"])
+	}
+
+	// 2. Trigger failures in intelligence service until circuit opens (threshold is 3)
+	for i := 0; i < 3; i++ {
+		r := httptest.NewRecorder()
+		handler.ServeHTTP(r, httptest.NewRequest(http.MethodPost, "/api/v1/routes/analyze", bytes.NewReader(validBody())))
+		if r.Code != http.StatusOK {
+			t.Fatalf("call %d: expected 200 fallback, got %d", i, r.Code)
+		}
+	}
+	if circuits.Intelligence.State() != circuit.StateOpen {
+		t.Fatalf("expected intelligence circuit to be OPEN after 3 failures, got %s", circuits.Intelligence.State())
+	}
+
+	// 3. Readiness should now report degraded fallback active due to open intelligence circuit
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health/ready", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 (degraded supported), got %d", rec.Code)
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &readyResp)
+	deps = readyResp["dependencies"].(map[string]any)
+	if deps["intelligence"] != "degraded_fallback_active" {
+		t.Fatalf("expected degraded_fallback_active, got %v", deps["intelligence"])
+	}
+
+	// 4. Trip routing circuit -> readiness must transition to 503 (not_ready)
+	_ = circuits.Routing.Execute(context.Background(), func() error { return errors.New("osrm down") })
+	_ = circuits.Routing.Execute(context.Background(), func() error { return errors.New("osrm down") })
+	_ = circuits.Routing.Execute(context.Background(), func() error { return errors.New("osrm down") })
+	if !circuits.Routing.IsOpen() {
+		t.Fatalf("expected routing circuit to be open")
+	}
+
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health/ready", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 not_ready when routing circuit is open, got %d", rec.Code)
 	}
 }

@@ -31,3 +31,50 @@ func TestCacheIsolationExpiryAndFailure(t *testing.T) {
 		t.Fatal("failure cached")
 	}
 }
+
+func TestCacheMetadataAndStaleServing(t *testing.T) {
+	c := &Cache[string]{TTL: 50 * time.Millisecond, Capacity: 2, ServeStaleOn: true}
+	ctx := context.Background()
+
+	// 1. Initial call -> miss
+	val, meta, err := c.DoWithMeta(ctx, "k1", func() (string, error) {
+		return "hello", nil
+	})
+	if err != nil || val != "hello" || meta.Status != "miss" || meta.Stale {
+		t.Fatalf("expected fresh miss, got %v, meta: %+v", err, meta)
+	}
+
+	// 2. Second call -> hit
+	val, meta, err = c.DoWithMeta(ctx, "k1", func() (string, error) {
+		return "should-not-be-called", nil
+	})
+	if err != nil || val != "hello" || meta.Status != "hit" || meta.Stale {
+		t.Fatalf("expected hit, got %v, meta: %+v", err, meta)
+	}
+
+	// 3. Wait for TTL to expire, upstream fails -> stale served
+	time.Sleep(60 * time.Millisecond)
+	val, meta, err = c.DoWithMeta(ctx, "k1", func() (string, error) {
+		return "", errors.New("upstream provider failure")
+	})
+	if err != nil || val != "hello" || meta.Status != "stale" || !meta.Stale {
+		t.Fatalf("expected stale serving on failure, got %v, val: %s, meta: %+v", err, val, meta)
+	}
+
+	// 4. Upstream recovers -> fresh miss
+	val, meta, err = c.DoWithMeta(ctx, "k1", func() (string, error) {
+		return "recovered", nil
+	})
+	if err != nil || val != "recovered" || meta.Status != "miss" || meta.Stale {
+		t.Fatalf("expected recovery, got %v, val: %s, meta: %+v", err, val, meta)
+	}
+
+	// 5. Nil cache -> bypass
+	var nilCache *Cache[string]
+	val, meta, err = nilCache.DoWithMeta(ctx, "k2", func() (string, error) {
+		return "bypass-val", nil
+	})
+	if err != nil || val != "bypass-val" || meta.Status != "bypass" {
+		t.Fatalf("expected bypass, got %v, meta: %+v", err, meta)
+	}
+}

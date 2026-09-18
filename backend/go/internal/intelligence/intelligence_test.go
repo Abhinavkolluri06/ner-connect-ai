@@ -117,3 +117,23 @@ func TestHeuristicFallbackDeterministicAndNormalized(t *testing.T) {
 		}
 	}
 }
+
+func TestHTTPClientRequestIDForwarding(t *testing.T) {
+	var receivedRequestID string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedRequestID = r.Header.Get("X-Request-ID")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"route_id":"r1","landslide_risk":0.2,"flood_risk":0.1,"weather_risk":0.3,"accessibility_score":0.8,"confidence":0.9}`))
+	}))
+	defer server.Close()
+
+	ctx := context.WithValue(context.Background(), "request_id", "test-trace-id-1234")
+	client := HTTPClient{BaseURL: server.URL, Client: server.Client()}
+	_, err := client.AnalyzeRisk(ctx, models.RiskRequest{RouteID: "r1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if receivedRequestID != "test-trace-id-1234" {
+		t.Fatalf("expected X-Request-ID header to be test-trace-id-1234, got %s", receivedRequestID)
+	}
+}

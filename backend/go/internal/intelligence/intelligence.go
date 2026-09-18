@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ner-connect-ai/backend-go/internal/middleware"
 	"github.com/ner-connect-ai/backend-go/internal/models"
 )
 
@@ -33,6 +34,9 @@ func (c HTTPClient) Healthy(ctx context.Context) bool {
 	if err != nil {
 		return false
 	}
+	if reqID := middleware.RequestIDFromContext(ctx); reqID != "" {
+		req.Header.Set("X-Request-ID", reqID)
+	}
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		return false
@@ -51,6 +55,9 @@ func (c HTTPClient) AnalyzeRisk(ctx context.Context, in models.RiskRequest) (mod
 		return models.RiskResponse{}, fmt.Errorf("create intelligence request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if reqID := middleware.RequestIDFromContext(ctx); reqID != "" {
+		req.Header.Set("X-Request-ID", reqID)
+	}
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		return models.RiskResponse{}, fmt.Errorf("intelligence request: %w", err)

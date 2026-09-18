@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ner-connect-ai/backend-go/internal/httpjson"
 	"github.com/ner-connect-ai/backend-go/internal/models"
@@ -63,25 +64,63 @@ func (p OpenMeteoProvider) Weather(ctx context.Context, r models.RouteCandidate)
 	if len(rows) != len(r.Segments) {
 		return models.Weather{}, fmt.Errorf("weather location count mismatch")
 	}
-	w := models.Weather{Source: "Open-Meteo: sum of next 24 hourly rain intervals (mm); model forecast, not observation"}
-	for _, f := range rows {
+	w := models.Weather{
+		Source: "Open-Meteo: arrival-time-aware hourly rain forecast (mm); model forecast, not observation",
+	}
+	now := time.Now().UTC()
+	hasTiming := r.ETAMinutes > 0
+	w.ArrivalAware = hasTiming
+
+	for i, f := range rows {
 		if f.Units.Rain != "mm" || len(f.Hourly.Rain) != 24 || len(f.Hourly.Time) != 24 {
 			return models.Weather{}, fmt.Errorf("incomplete 24-hour rainfall forecast")
 		}
-		total := 0.0
 		for _, v := range f.Hourly.Rain {
 			if v == nil || *v < 0 || math.IsNaN(*v) || math.IsInf(*v, 0) {
 				return models.Weather{}, fmt.Errorf("missing or invalid rainfall value")
 			}
-			total += *v
 		}
 		if w.WindowStart != "" && (w.WindowStart != f.Hourly.Time[0]+"Z" || w.WindowEnd != f.Hourly.Time[23]+"Z") {
 			return models.Weather{}, fmt.Errorf("weather windows do not match")
 		}
-		w.SegmentRainfallMM = append(w.SegmentRainfallMM, total)
-		w.RainfallMM = math.Max(w.RainfallMM, total)
 		w.WindowStart = f.Hourly.Time[0] + "Z"
 		w.WindowEnd = f.Hourly.Time[23] + "Z"
+
+		var segmentRain float64
+		if hasTiming {
+			// Estimate arrival time at this segment along the route
+			fraction := 0.0
+			if len(rows) > 1 {
+				fraction = float64(i) / float64(len(rows)-1)
+			}
+			segmentETA := time.Duration(fraction*r.ETAMinutes*60) * time.Second
+			segmentArrival := now.Add(segmentETA)
+			w.SegmentArrivals = append(w.SegmentArrivals, segmentArrival.Format(time.RFC3339))
+
+			// Match arrival time to the nearest forecast hour (0..23)
+			baseTime, parseErr := time.Parse("2006-01-02T15:04", f.Hourly.Time[0])
+			hourIdx := 0
+			if parseErr == nil && !segmentArrival.Before(baseTime) {
+				diffHours := int(segmentArrival.Sub(baseTime).Hours())
+				if diffHours >= 24 {
+					hourIdx = 23
+				} else if diffHours >= 0 {
+					hourIdx = diffHours
+				}
+			}
+			segmentRain = *f.Hourly.Rain[hourIdx]
+		} else {
+			// Fallback: without route timing, sum next 24 hours
+			total := 0.0
+			for _, v := range f.Hourly.Rain {
+				total += *v
+			}
+			segmentRain = total
+			w.Source = "Open-Meteo: sum of next 24 hourly rain intervals (mm); model forecast, not observation"
+		}
+
+		w.SegmentRainfallMM = append(w.SegmentRainfallMM, segmentRain)
+		w.RainfallMM = math.Max(w.RainfallMM, segmentRain)
 	}
 	w.Risk = math.Min(1, w.RainfallMM/120)
 	return w, nil

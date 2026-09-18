@@ -46,3 +46,49 @@ func TestForecastBySegmentAndRejectsMissingValues(t *testing.T) {
 		})
 	}
 }
+
+func TestArrivalAwareWeatherForecast(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rows := []any{}
+		for i := 1; i <= 3; i++ {
+			rain := []any{}
+			times := []string{}
+			for j := 0; j < 24; j++ {
+				// hourly rainfall: hour * 10
+				rain = append(rain, float64(j*10))
+				times = append(times, fmt.Sprintf("2026-09-07T%02d:00", j))
+			}
+			rows = append(rows, map[string]any{
+				"hourly_units": map[string]string{"rain": "mm"},
+				"hourly":       map[string]any{"rain": rain, "time": times},
+			})
+		}
+		json.NewEncoder(w).Encode(rows)
+	}))
+	defer s.Close()
+
+	p := OpenMeteoProvider{BaseURL: s.URL, Client: s.Client()}
+	candidate := models.RouteCandidate{
+		RouteID:    "route-timed",
+		ETAMinutes: 120, // 2 hours
+		Segments: []models.Segment{
+			{Latitude: 26.1, Longitude: 91.7},
+			{Latitude: 25.8, Longitude: 91.8},
+			{Latitude: 25.5, Longitude: 91.9},
+		},
+	}
+
+	got, err := p.Weather(context.Background(), candidate)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.ArrivalAware {
+		t.Fatalf("expected ArrivalAware to be true")
+	}
+	if len(got.SegmentArrivals) != 3 {
+		t.Fatalf("expected 3 segment arrival timestamps, got %d", len(got.SegmentArrivals))
+	}
+	if len(got.SegmentRainfallMM) != 3 {
+		t.Fatalf("expected 3 segment rainfall values, got %d", len(got.SegmentRainfallMM))
+	}
+}

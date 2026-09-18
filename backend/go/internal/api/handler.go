@@ -544,8 +544,14 @@ func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 750*time.Millisecond)
 	defer cancel()
 	routingOK := h.Routing != nil && h.Routing.Healthy(ctx)
+	if h.Service != nil && h.Service.Circuit != nil && h.Service.Circuit.Routing != nil && h.Service.Circuit.Routing.IsOpen() {
+		routingOK = false
+	}
 	repoOK := h.Repository == nil || h.Repository.Healthy(ctx)
 	intelOK := h.Service != nil && h.Service.Intelligence != nil && h.Service.Intelligence.Healthy(ctx)
+	if h.Service != nil && h.Service.Circuit != nil && h.Service.Circuit.Intelligence != nil && h.Service.Circuit.Intelligence.IsOpen() {
+		intelOK = false
+	}
 	status := http.StatusOK
 	state := "ready"
 	if !routingOK || !repoOK {
@@ -556,14 +562,24 @@ func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
 	if !intelOK {
 		intelStatus = "degraded_fallback_active"
 	}
+	depMap := map[string]any{
+		"routing":      routingOK,
+		"repository":   repoOK,
+		"intelligence": intelStatus,
+		"weather":      "degraded_operation_supported",
+	}
+	if h.Service != nil && h.Service.Circuit != nil {
+		depMap["circuits"] = map[string]string{
+			"routing":      string(h.Service.Circuit.Routing.State()),
+			"weather":      string(h.Service.Circuit.Weather.State()),
+			"intelligence": string(h.Service.Circuit.Intelligence.State()),
+			"terrain":      string(h.Service.Circuit.Terrain.State()),
+			"feed":         string(h.Service.Circuit.Feed.State()),
+		}
+	}
 	writeJSON(w, status, map[string]any{
-		"status": state,
-		"dependencies": map[string]any{
-			"routing":      routingOK,
-			"repository":   repoOK,
-			"intelligence": intelStatus,
-			"weather":      "degraded_operation_supported",
-		},
+		"status":       state,
+		"dependencies": depMap,
 	})
 }
 func writeError(w http.ResponseWriter, status int, code, message, id string) {

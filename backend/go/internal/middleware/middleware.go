@@ -12,17 +12,49 @@ type contextKey string
 
 const requestIDKey contextKey = "request_id"
 
+func isValidUUID(s string) bool {
+	if len(s) != 36 {
+		return false
+	}
+	for i := 0; i < 36; i++ {
+		c := s[i]
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			if c != '-' {
+				return false
+			}
+		} else {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// IDs identify saved records, so never trust a caller-selected collision.
-		id := newID()
+		id := r.Header.Get("X-Request-ID")
+		if !isValidUUID(id) {
+			id = newID()
+		}
 		w.Header().Set("X-Request-ID", id)
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestIDKey, id)))
 	})
 }
 func RequestIDFrom(r *http.Request) string {
-	v, _ := r.Context().Value(requestIDKey).(string)
-	return v
+	return RequestIDFromContext(r.Context())
+}
+func RequestIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if v, ok := ctx.Value(requestIDKey).(string); ok && v != "" {
+		return v
+	}
+	if v, ok := ctx.Value("request_id").(string); ok && v != "" {
+		return v
+	}
+	return ""
 }
 func newID() string {
 	var b [16]byte

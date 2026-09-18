@@ -26,17 +26,18 @@ type LineString struct {
 }
 
 type DataQuality struct {
-	RoutingSource   string    `json:"routing_source"`
-	WeatherSource   string    `json:"weather_source"`
-	TerrainSource   string    `json:"terrain_source"`
-	HistorySource   string    `json:"history_source"`
-	RoadSource      string    `json:"road_source"`
-	RetrievedAt     time.Time `json:"retrieved_at"`
-	WeatherStart    string    `json:"weather_start,omitempty"`
-	WeatherEnd      string    `json:"weather_end,omitempty"`
-	FeatureCoverage float64   `json:"feature_coverage"`
-	MissingFeatures []string  `json:"missing_features"`
-	Warnings        []string  `json:"warnings"`
+	RoutingSource       string    `json:"routing_source"`
+	WeatherSource       string    `json:"weather_source"`
+	TerrainSource       string    `json:"terrain_source"`
+	HistorySource       string    `json:"history_source"`
+	RoadSource          string    `json:"road_source"`
+	RetrievedAt         time.Time `json:"retrieved_at"`
+	WeatherStart        string    `json:"weather_start,omitempty"`
+	WeatherEnd          string    `json:"weather_end,omitempty"`
+	WeatherArrivalAware bool      `json:"weather_arrival_aware,omitempty"`
+	FeatureCoverage     float64   `json:"feature_coverage"`
+	MissingFeatures     []string  `json:"missing_features"`
+	Warnings            []string  `json:"warnings"`
 }
 
 type Segment struct {
@@ -69,6 +70,8 @@ type Weather struct {
 	Source            string    `json:"source,omitempty"`
 	WindowStart       string    `json:"window_start,omitempty"`
 	WindowEnd         string    `json:"window_end,omitempty"`
+	ArrivalAware      bool      `json:"arrival_aware,omitempty"`
+	SegmentArrivals   []string  `json:"segment_arrivals,omitempty"`
 }
 
 type RiskRequest struct {
