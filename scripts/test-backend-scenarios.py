@@ -435,9 +435,10 @@ def verify(case, status, body):
             for r in ranked
         )
         if case["fault"] in ("python_down", "weather_down"):
-            checks["explicit_fallback"] = body[
-                "intelligence_mode"
-            ] == "fallback" and bool(body["warnings"])
+            checks["explicit_fallback"] = (
+                body["intelligence_mode"] in ("go_fallback", "partial")
+                and bool(body["warnings"])
+            )
         if case["fault"] == "close_a":
             checks["closed_route_excluded"] = len(ranked) == 2 and all(
                 r["route_id"] != "A" for r in ranked

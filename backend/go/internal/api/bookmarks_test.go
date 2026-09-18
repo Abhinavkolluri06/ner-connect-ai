@@ -163,4 +163,3 @@ func TestBookmarksAndUserIsolationAPI(t *testing.T) {
 		t.Fatalf("expected 200 when User A deletes analysis, got %d", recDelAnalysis.Code)
 	}
 }
-

@@ -271,4 +271,3 @@ func TestHistoryRetentionPrune(t *testing.T) {
 		})
 	}
 }
-

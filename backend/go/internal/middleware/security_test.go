@@ -169,4 +169,3 @@ func TestSupabaseJWTSignatureAndClaims(t *testing.T) {
 		t.Fatalf("expected expired=true, ok=false, got expired=%v, ok=%v", expired, ok)
 	}
 }
-

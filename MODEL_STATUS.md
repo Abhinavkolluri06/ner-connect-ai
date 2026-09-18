@@ -16,7 +16,7 @@ This document records the serving status, scientific validity, training datasets
 | Status | Definition | Serving Policy |
 | :--- | :--- | :--- |
 | `approved_ml` | Validated on regional Northeast India holdouts with calibration & uncertainty bounds. | Allowed for live inference when input features pass validation. |
-| `heuristic` | Deterministic mathematical domain heuristics based on physical proxies. | Active default in production when ML is unapproved or inputs are out-of-domain. |
+| `heuristic` | Deterministic mathematical domain heuristics based on physical proxies. | Active default in production when ML is unapproved or inputs fail input-domain / feature-range validation. |
 | `research` | Experimental research models (e.g. Kentucky landslide study) under active investigation. | Quarantined to research workflows; never used for live user-facing routing. |
 | `unavailable` | Data or models that do not meet scientific standards for inference. | Explicitly declared as `unavailable` with reason. |
 

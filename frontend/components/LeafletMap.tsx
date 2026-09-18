@@ -273,7 +273,7 @@ export default function LeafletMap({
       {!loading && !error && !hasRoutes ? (
         <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center bg-white/15">
           <p className="rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm">
-            Find a safe route to show road options.
+            Analyze routes to show options and recommendations.
           </p>
         </div>
       ) : null}

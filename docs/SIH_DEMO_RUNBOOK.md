@@ -71,7 +71,7 @@ This demonstration proves architectural resilience: **when the internal Python i
      - Destination: `Shillong`
      - Vehicle: `Truck`
      - Priority: `Emergency`
-   - Click **Find Safe Route**.
+   - Click **Find Recommended Route**.
    - Observe the map and route cards:
      - Badge displays: `DEMONSTRATION SCENARIO` or `HEURISTIC ESTIMATE`.
      - Route 1 (Recommended), Route 2, and Route 3 appear with exact road geometry.
@@ -97,7 +97,7 @@ This demonstration proves architectural resilience: **when the internal Python i
      ```
 
 3. **Re-run Route Planning in Degraded Mode**:
-   - In the browser, click **Find Safe Route** again.
+   - In the browser, click **Find Recommended Route** again.
    - Observe:
      - Request succeeds (HTTP 200).
      - Badge clearly updates to: `GO FALLBACK ACTIVE`.
@@ -110,7 +110,7 @@ This demonstration proves architectural resilience: **when the internal Python i
      ```bash
      python -m app.main
      ```
-   - In browser, click **Find Safe Route** again.
+   - In browser, click **Find Recommended Route** again.
    - Status instantly recovers from fallback to healthy intelligence.
 
 ---

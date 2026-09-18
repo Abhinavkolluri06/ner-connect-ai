@@ -46,3 +46,4 @@ __pycache__/
 backend/python/.venv/
 backend/python/model_artifacts/routeguard/
 frontend/.next/
+/scratch/

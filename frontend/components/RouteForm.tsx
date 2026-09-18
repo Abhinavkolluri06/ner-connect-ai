@@ -517,7 +517,7 @@ export default function RouteForm({
         >
           {loading
             ? "Assessing route…"
-            : "Find Safe Route →"}
+            : "Find Recommended Route →"}
         </button>
 
         <button
