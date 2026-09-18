@@ -1,5 +1,6 @@
 
 
+import type { RouteOption } from "@/lib/types";
 import { useEffect, useState } from "react";
 import {
   CircleMarker,
@@ -37,6 +38,7 @@ type LeafletMapProps = {
   destination: string;
   hasRoutes: boolean;
   selectedRouteId: string | null;
+  routes?: RouteOption[];
 };
 
 const DEFAULT_CENTER: Coordinate = [25.85, 92.1];
@@ -89,6 +91,7 @@ export default function LeafletMap({
   destination,
   hasRoutes,
   selectedRouteId,
+  routes = [],
 }: LeafletMapProps) {
   const [data, setData] = useState<MapData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,6 +100,35 @@ export default function LeafletMap({
   useEffect(() => {
     if (!hasRoutes || !origin.trim() || !destination.trim()) {
       setData(null);
+      setError(null);
+      return;
+    }
+
+    // Direct use of authoritative backend coordinates if available
+    const validBackendRoutes = routes.filter(
+      (r) => r.coordinates && r.coordinates.length > 0,
+    );
+    if (validBackendRoutes.length > 0) {
+      const firstCoords = validBackendRoutes[0].coordinates!;
+      setData({
+        origin: {
+          lat: firstCoords[0][0],
+          lon: firstCoords[0][1],
+          displayName: origin,
+        },
+        destination: {
+          lat: firstCoords[firstCoords.length - 1][0],
+          lon: firstCoords[firstCoords.length - 1][1],
+          displayName: destination,
+        },
+        routes: validBackendRoutes.map((r) => ({
+          id: r.id,
+          distanceKm: r.distanceKm,
+          durationMinutes: r.etaMinutes,
+          coordinates: r.coordinates!,
+        })),
+      });
+      setLoading(false);
       setError(null);
       return;
     }
@@ -241,7 +273,7 @@ export default function LeafletMap({
       {!loading && !error && !hasRoutes ? (
         <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center bg-white/15">
           <p className="rounded-md border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm">
-            Find a safe route to show road options.
+            Analyze routes to show options and recommendations.
           </p>
         </div>
       ) : null}

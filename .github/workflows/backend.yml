@@ -1,9 +1,10 @@
-name: Backend checks
+name: CI Checks
 on:
   push:
   pull_request:
 permissions:
   contents: read
+
 jobs:
   go:
     runs-on: ubuntu-latest
@@ -26,13 +27,20 @@ jobs:
         with:
           go-version: "1.25.x"
           cache-dependency-path: backend/go/go.sum
-      - run: go test -race ./...
+      - name: Go Race Detector
+        run: go test -race ./...
         working-directory: backend/go
-      - run: go vet ./...
+      - name: Go Vet
+        run: go vet ./...
         working-directory: backend/go
-      - run: test -z "$(gofmt -l .)"
+      - name: Go Fmt Check
+        run: test -z "$(gofmt -l .)"
         working-directory: backend/go
-  python-and-smoke:
+      - name: Go Full Test Suite
+        run: go test -v ./...
+        working-directory: backend/go
+
+  python-and-containers:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,17 +51,49 @@ jobs:
         with:
           go-version: "1.25.x"
           cache-dependency-path: backend/go/go.sum
-      - run: pip install -r backend/python/requirements-dev.txt -r backend/python/requirements-boosting.txt
-      - run: python -m pytest -q
+      - name: Install Python Dependencies
+        run: pip install -r backend/python/requirements-dev.txt -r backend/python/requirements-boosting.txt
+      - name: Python Pytest
+        run: python -m pytest -q
         working-directory: backend/python
-      - run: python -m ruff check .
+      - name: Python Ruff Lint
+        run: python -m ruff check .
         working-directory: backend/python
-      - run: python scripts/smoke-python-go.py
-      - run: docker compose config --quiet
+      - name: Smoke Python-Go Integration
+        run: python scripts/smoke-python-go.py
+      - name: Docker Build Go
+        run: docker build -f backend/go/Dockerfile -t ner-backend-go:ci .
+      - name: Docker Build Python
+        run: docker build -f backend/python/Dockerfile -t ner-backend-python:ci .
+      - name: Docker Compose Config Check
+        run: docker compose config --quiet
         env:
           API_TOKEN: ci-only-ephemeral-token-longer-than-32-chars
           POSTGRES_PASSWORD: ci-only-ephemeral-password
-      - run: docker compose build
+      - name: Docker Compose Build
+        run: docker compose build
         env:
           API_TOKEN: ci-only-ephemeral-token-longer-than-32-chars
           POSTGRES_PASSWORD: ci-only-ephemeral-password
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Frontend Dependencies
+        run: npm ci
+      - name: TypeScript Type Check
+        run: npx tsc --noEmit
+      - name: Next.js Production Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: "https://ci-test.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "ci-dummy-anon-key-for-static-typecheck"

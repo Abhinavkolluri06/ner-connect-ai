@@ -11,17 +11,38 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/ner-connect-ai/backend-go/internal/middleware"
 	"github.com/ner-connect-ai/backend-go/internal/models"
 )
 
 type Provider interface {
 	AnalyzeRisk(context.Context, models.RiskRequest) (models.RiskResponse, error)
+	Healthy(context.Context) bool
 }
 
 type HTTPClient struct {
 	BaseURL          string
 	Client           *http.Client
 	MaxResponseBytes int64
+}
+
+func (c HTTPClient) Healthy(ctx context.Context) bool {
+	if c.BaseURL == "" {
+		return false
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(c.BaseURL, "/")+"/health", nil)
+	if err != nil {
+		return false
+	}
+	if reqID := middleware.RequestIDFromContext(ctx); reqID != "" {
+		req.Header.Set("X-Request-ID", reqID)
+	}
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
 
 func (c HTTPClient) AnalyzeRisk(ctx context.Context, in models.RiskRequest) (models.RiskResponse, error) {
@@ -34,6 +55,9 @@ func (c HTTPClient) AnalyzeRisk(ctx context.Context, in models.RiskRequest) (mod
 		return models.RiskResponse{}, fmt.Errorf("create intelligence request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if reqID := middleware.RequestIDFromContext(ctx); reqID != "" {
+		req.Header.Set("X-Request-ID", reqID)
+	}
 	resp, err := c.Client.Do(req)
 	if err != nil {
 		return models.RiskResponse{}, fmt.Errorf("intelligence request: %w", err)
@@ -118,8 +142,12 @@ func (m MockProvider) AnalyzeRisk(_ context.Context, r models.RiskRequest) (mode
 	return v, nil
 }
 
+func (m MockProvider) Healthy(context.Context) bool { return m.Err == nil }
+
 // HeuristicFallbackRiskProvider is deterministic and is not a trained ML model.
 type HeuristicFallbackRiskProvider struct{}
+
+func (HeuristicFallbackRiskProvider) Healthy(context.Context) bool { return true }
 
 func (HeuristicFallbackRiskProvider) AnalyzeRisk(ctx context.Context, r models.RiskRequest) (models.RiskResponse, error) {
 	if len(r.Segments) == 0 {

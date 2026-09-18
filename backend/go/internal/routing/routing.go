@@ -25,13 +25,82 @@ func (DemoProvider) Routes(_ context.Context, req models.AnalyzeRequest) ([]mode
 		return nil, fmt.Errorf("demo route not found")
 	}
 	candidates := []models.RouteCandidate{
-		{RouteID: "route-a", DistanceKM: 99.4, ETAMinutes: 176, Reliability: .55, Geometry: "demo:a", Segments: []models.Segment{{Latitude: 25.57, Longitude: 91.88, SlopeDeg: 38, ElevationM: 1450, HistoricalLandslides: 9, RoadConditionScore: 52}}},
-		{RouteID: "route-b", DistanceKM: 103.2, ETAMinutes: 188, Reliability: .92, Geometry: "demo:b", Segments: []models.Segment{{Latitude: 25.55, Longitude: 91.82, SlopeDeg: 12, ElevationM: 1200, HistoricalLandslides: 1, RoadConditionScore: 88}}},
-		{RouteID: "route-c", DistanceKM: 116.8, ETAMinutes: 211, Reliability: .72, Geometry: "demo:c", Segments: []models.Segment{{Latitude: 25.48, Longitude: 91.75, SlopeDeg: 24, ElevationM: 1320, HistoricalLandslides: 4, RoadConditionScore: 70}}},
+		{
+			RouteID:     "route-a",
+			DistanceKM:  99.4,
+			ETAMinutes:  176,
+			Reliability: .55,
+			Geometry:    "demo:a",
+			GeoJSON: &models.LineString{
+				Type: "LineString",
+				Coordinates: [][]float64{
+					{91.7362, 26.1445},
+					{91.7610, 26.1200},
+					{91.8100, 26.0400},
+					{91.8500, 25.9500},
+					{91.8800, 25.9000},
+					{91.8950, 25.7500},
+					{91.8988, 25.6667},
+					{91.8933, 25.5788},
+				},
+			},
+			Segments: []models.Segment{{Latitude: 25.57, Longitude: 91.88, SlopeDeg: 38, ElevationM: 1450, HistoricalLandslides: 9, RoadConditionScore: 52}},
+		},
+		{
+			RouteID:     "route-b",
+			DistanceKM:  103.2,
+			ETAMinutes:  188,
+			Reliability: .92,
+			Geometry:    "demo:b",
+			GeoJSON: &models.LineString{
+				Type: "LineString",
+				Coordinates: [][]float64{
+					{91.7362, 26.1445},
+					{91.7100, 26.1100},
+					{91.7500, 26.0200},
+					{91.8200, 25.9100},
+					{91.8600, 25.8000},
+					{91.8800, 25.7000},
+					{91.8850, 25.6200},
+					{91.8933, 25.5788},
+				},
+			},
+			Segments: []models.Segment{{Latitude: 25.55, Longitude: 91.82, SlopeDeg: 12, ElevationM: 1200, HistoricalLandslides: 1, RoadConditionScore: 88}},
+		},
+		{
+			RouteID:     "route-c",
+			DistanceKM:  116.8,
+			ETAMinutes:  211,
+			Reliability: .72,
+			Geometry:    "demo:c",
+			GeoJSON: &models.LineString{
+				Type: "LineString",
+				Coordinates: [][]float64{
+					{91.7362, 26.1445},
+					{91.8000, 26.1300},
+					{91.8600, 26.0500},
+					{91.9100, 25.9200},
+					{91.9300, 25.8100},
+					{91.9200, 25.7100},
+					{91.9050, 25.6300},
+					{91.8933, 25.5788},
+				},
+			},
+			Segments: []models.Segment{{Latitude: 25.48, Longitude: 91.75, SlopeDeg: 24, ElevationM: 1320, HistoricalLandslides: 4, RoadConditionScore: 70}},
+		},
 	}
 	for i := range candidates {
-		candidates[i].Data = models.DataQuality{RoutingSource: "demo", WeatherSource: "demo", TerrainSource: "demo", HistorySource: "synthetic demo", RoadSource: "synthetic demo", FeatureCoverage: 1, MissingFeatures: []string{}, Warnings: []string{"Synthetic demonstration route and features; not navigation data. No real map geometry is available in offline demo mode."}}
-		candidates[i].VehicleSuitability = "demo_not_verified"
+		candidates[i].Data = models.DataQuality{
+			RoutingSource:   "demo",
+			WeatherSource:   "demo",
+			TerrainSource:   "demo",
+			HistorySource:   "synthetic demo",
+			RoadSource:      "synthetic demo",
+			FeatureCoverage: 1,
+			MissingFeatures: []string{},
+			Warnings:        []string{"Demonstration scenario — not live data. Controlled corridor features for offline demonstration."},
+		}
+		candidates[i].VehicleSuitability = "demo_verified"
 	}
 	return candidates, nil
 }

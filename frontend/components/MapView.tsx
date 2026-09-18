@@ -61,6 +61,7 @@ export default function MapView({
           destination={destination}
           hasRoutes={routes.length > 0}
           selectedRouteId={selectedRouteId}
+          routes={routes}
         />
       </div>
     </section>

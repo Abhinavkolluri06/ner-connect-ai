@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ner-connect-ai/backend-go/internal/api"
+	"github.com/ner-connect-ai/backend-go/internal/circuit"
 	"github.com/ner-connect-ai/backend-go/internal/config"
 	"github.com/ner-connect-ai/backend-go/internal/database"
 	"github.com/ner-connect-ai/backend-go/internal/features"
@@ -76,7 +77,24 @@ func main() {
 		defer closer.Close()
 	}
 	intel := intelligence.HTTPClient{BaseURL: cfg.PythonServiceURL, Client: client}
-	service := &api.Service{Routing: routeProvider, Weather: weatherProvider, Intelligence: intel, Fallback: intelligence.HeuristicFallbackRiskProvider{}, Scoring: scoring.Engine{Normal: cfg.NormalWeights, Emergency: cfg.EmergencyWeights}, Repository: repo, Logger: logger}
+	circuits := circuit.NewRegistry()
+	service := &api.Service{
+		Routing:      routeProvider,
+		Weather:      weatherProvider,
+		Intelligence: intel,
+		Fallback:     intelligence.HeuristicFallbackRiskProvider{},
+		Scoring:      scoring.Engine{Normal: cfg.NormalWeights, Emergency: cfg.EmergencyWeights},
+		Repository:   repo,
+		Logger:       logger,
+		Circuit:      circuits,
+		Timeouts: api.ServiceTimeouts{
+			Routing:  cfg.RoutingTimeout,
+			Weather:  cfg.WeatherTimeout,
+			Terrain:  cfg.TerrainTimeout,
+			Feed:     cfg.FeedTimeout,
+			Database: cfg.DatabaseTimeout,
+		},
+	}
 	if !cfg.DemoMode && cfg.TerrainURL != "" {
 		service.Terrain = &features.Terrain{BaseURL: cfg.TerrainURL, APIKey: cfg.WeatherAPIKey, Client: providerClient, Cache: &memo.Cache[[]*float64]{TTL: 24 * time.Hour, Capacity: 32}}
 	}

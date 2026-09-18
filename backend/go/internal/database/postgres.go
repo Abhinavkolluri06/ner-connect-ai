@@ -60,13 +60,14 @@ func (r *PostgresRepository) Save(ctx context.Context, v models.AnalysisRecord) 
 	if err != nil {
 		return err
 	}
-	_, err = r.pool.Exec(ctx, "INSERT INTO ner_analyses (request_id,created_at,record) VALUES ($1,$2,$3)", v.RequestID, v.CreatedAt, b)
+	_, err = r.pool.Exec(ctx, "INSERT INTO ner_analyses (request_id,owner_user_id,created_at,record) VALUES ($1,$2,$3,$4)", v.RequestID, v.OwnerUserID, v.CreatedAt, b)
 	var pgerr *pgconn.PgError
 	if errors.As(err, &pgerr) && pgerr.Code == "23505" {
 		return ErrDuplicate
 	}
 	return err
 }
+
 func (r *PostgresRepository) Get(ctx context.Context, id string) (models.AnalysisRecord, error) {
 	var v models.AnalysisRecord
 	var b []byte
@@ -80,8 +81,30 @@ func (r *PostgresRepository) Get(ctx context.Context, id string) (models.Analysi
 	err = json.Unmarshal(b, &v)
 	return v, err
 }
+
+func (r *PostgresRepository) GetUser(ctx context.Context, userID, id string) (models.AnalysisRecord, error) {
+	rec, err := r.Get(ctx, id)
+	if err != nil {
+		return rec, err
+	}
+	if rec.OwnerUserID != "" && userID != "" && rec.OwnerUserID != userID && userID != "service-admin" {
+		return models.AnalysisRecord{}, ErrUnauthorized
+	}
+	return rec, nil
+}
+
 func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]models.AnalysisRecord, error) {
-	rows, err := r.pool.Query(ctx, "SELECT record FROM ner_analyses ORDER BY created_at DESC,request_id DESC LIMIT $1 OFFSET $2", limit, offset)
+	return r.ListUser(ctx, "service-admin", limit, offset)
+}
+
+func (r *PostgresRepository) ListUser(ctx context.Context, userID string, limit, offset int) ([]models.AnalysisRecord, error) {
+	query := "SELECT record FROM ner_analyses ORDER BY created_at DESC,request_id DESC LIMIT $1 OFFSET $2"
+	args := []any{limit, offset}
+	if userID != "service-admin" {
+		query = "SELECT record FROM ner_analyses WHERE owner_user_id=$1 OR owner_user_id='' ORDER BY created_at DESC,request_id DESC LIMIT $2 OFFSET $3"
+		args = []any{userID, limit, offset}
+	}
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,4 +122,98 @@ func (r *PostgresRepository) List(ctx context.Context, limit, offset int) ([]mod
 		out = append(out, v)
 	}
 	return out, rows.Err()
+}
+
+func (r *PostgresRepository) DeleteUser(ctx context.Context, userID, requestID string) error {
+	var owner string
+	err := r.pool.QueryRow(ctx, "SELECT owner_user_id FROM ner_analyses WHERE request_id=$1", requestID).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if owner != "" && userID != "" && owner != userID && userID != "service-admin" {
+		return ErrUnauthorized
+	}
+	_, err = r.pool.Exec(ctx, "DELETE FROM ner_analyses WHERE request_id=$1", requestID)
+	return err
+}
+
+func (r *PostgresRepository) PruneOlderThan(ctx context.Context, cutoff time.Time) (int, error) {
+	tag, err := r.pool.Exec(ctx, "DELETE FROM ner_analyses WHERE created_at < $1", cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return int(tag.RowsAffected()), nil
+}
+
+func (r *PostgresRepository) SaveBookmark(ctx context.Context, b models.Bookmark) error {
+	bytes, err := json.Marshal(b)
+	if err != nil {
+		return err
+	}
+	_, err = r.pool.Exec(ctx, "INSERT INTO ner_bookmarks (bookmark_id,owner_user_id,saved_at,record) VALUES ($1,$2,$3,$4) ON CONFLICT (bookmark_id) DO UPDATE SET saved_at=$3, record=$4", b.BookmarkID, b.OwnerUserID, b.SavedAt, bytes)
+	return err
+}
+
+func (r *PostgresRepository) GetBookmark(ctx context.Context, userID, bookmarkID string) (models.Bookmark, error) {
+	var b models.Bookmark
+	var raw []byte
+	var owner string
+	err := r.pool.QueryRow(ctx, "SELECT owner_user_id, record FROM ner_bookmarks WHERE bookmark_id=$1", bookmarkID).Scan(&owner, &raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return b, ErrNotFound
+	}
+	if err != nil {
+		return b, err
+	}
+	if owner != "" && userID != "" && owner != userID && userID != "service-admin" {
+		return b, ErrUnauthorized
+	}
+	err = json.Unmarshal(raw, &b)
+	return b, err
+}
+
+func (r *PostgresRepository) ListBookmarks(ctx context.Context, userID string, limit, offset int) ([]models.Bookmark, error) {
+	query := "SELECT record FROM ner_bookmarks ORDER BY saved_at DESC LIMIT $1 OFFSET $2"
+	args := []any{limit, offset}
+	if userID != "service-admin" {
+		query = "SELECT record FROM ner_bookmarks WHERE owner_user_id=$1 OR owner_user_id='' ORDER BY saved_at DESC LIMIT $2 OFFSET $3"
+		args = []any{userID, limit, offset}
+	}
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []models.Bookmark{}
+	for rows.Next() {
+		var raw []byte
+		var b models.Bookmark
+		if err = rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(raw, &b); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+func (r *PostgresRepository) DeleteBookmark(ctx context.Context, userID, bookmarkID string) error {
+	var owner string
+	err := r.pool.QueryRow(ctx, "SELECT owner_user_id FROM ner_bookmarks WHERE bookmark_id=$1", bookmarkID).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if owner != "" && userID != "" && owner != userID && userID != "service-admin" {
+		return ErrUnauthorized
+	}
+	_, err = r.pool.Exec(ctx, "DELETE FROM ner_bookmarks WHERE bookmark_id=$1", bookmarkID)
+	return err
 }

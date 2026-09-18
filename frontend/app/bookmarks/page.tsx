@@ -137,6 +137,15 @@ export default function BookmarksPage() {
         throw deleteError;
       }
 
+      // Sync deletion to Go backend
+      try {
+        await fetch(`/api/v1/bookmarks/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
+      } catch {
+        // non-blocking sync
+      }
+
       setBookmarks((current) =>
         current.filter(
           (bookmark) =>

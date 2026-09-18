@@ -87,3 +87,74 @@ func TestInvalidWeights(t *testing.T) {
 		t.Fatal("expected invalid weights error")
 	}
 }
+
+func TestAbsoluteTradeOffGuards(t *testing.T) {
+	// Two routes with virtually identical ETA (100.0 vs 100.1 mins) and identical distance (50.0 vs 50.1 km)
+	// Route B has slightly better safety. Without trade-off guard, an extreme 6-second ETA normalization swing could distort ranking.
+	inputs := []Input{
+		{Candidate: models.RouteCandidate{RouteID: "route-a", DistanceKM: 50.0, ETAMinutes: 100.0, Reliability: 0.8}, Risk: models.RiskResponse{LandslideRisk: 0.3, FloodRisk: 0.2, WeatherRisk: 0.2, AccessibilityScore: 0.8}},
+		{Candidate: models.RouteCandidate{RouteID: "route-b", DistanceKM: 50.1, ETAMinutes: 100.1, Reliability: 0.8}, Risk: models.RiskResponse{LandslideRisk: 0.1, FloodRisk: 0.1, WeatherRisk: 0.1, AccessibilityScore: 0.85}},
+	}
+	res, err := engine().Rank(inputs, "normal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res[0].RouteID != "route-b" {
+		t.Fatalf("expected safer route-b to win despite 6s ETA difference, got %s", res[0].RouteID)
+	}
+}
+
+func TestDeterministicTieHandling(t *testing.T) {
+	// Two identical routes in different input orders
+	in1 := []Input{
+		{Candidate: models.RouteCandidate{RouteID: "route-1", DistanceKM: 100, ETAMinutes: 120, Reliability: 0.8}, Risk: models.RiskResponse{LandslideRisk: 0.2, FloodRisk: 0.2, WeatherRisk: 0.2, AccessibilityScore: 0.8}},
+		{Candidate: models.RouteCandidate{RouteID: "route-2", DistanceKM: 100, ETAMinutes: 120, Reliability: 0.8}, Risk: models.RiskResponse{LandslideRisk: 0.2, FloodRisk: 0.2, WeatherRisk: 0.2, AccessibilityScore: 0.8}},
+	}
+	in2 := []Input{in1[1], in1[0]}
+
+	res1, _ := engine().Rank(in1, "normal")
+	res2, _ := engine().Rank(in2, "normal")
+
+	if res1[0].RouteID != res2[0].RouteID {
+		t.Fatalf("tie handling not deterministic: got %s vs %s", res1[0].RouteID, res2[0].RouteID)
+	}
+}
+
+func TestStructuredRecommendationReasons(t *testing.T) {
+	// Case 1: Multiple routes with hazard delta
+	inputs := []Input{
+		{Candidate: models.RouteCandidate{RouteID: "route-fast", DistanceKM: 100, ETAMinutes: 100, Reliability: 0.6}, Risk: models.RiskResponse{LandslideRisk: 0.7, FloodRisk: 0.4, WeatherRisk: 0.5, AccessibilityScore: 0.6}},
+		{Candidate: models.RouteCandidate{RouteID: "route-safe", DistanceKM: 105, ETAMinutes: 110, Reliability: 0.9}, Risk: models.RiskResponse{LandslideRisk: 0.1, FloodRisk: 0.1, WeatherRisk: 0.1, AccessibilityScore: 0.9}},
+	}
+	ranked, err := engine().Rank(inputs, "safest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ranked[0].RouteID != "route-safe" {
+		t.Fatalf("expected route-safe, got %s", ranked[0].RouteID)
+	}
+	if len(ranked[0].RecommendationReasons) == 0 {
+		t.Fatal("expected structured recommendation reasons")
+	}
+	foundHazard := false
+	for _, r := range ranked[0].RecommendationReasons {
+		if r.Code == "LOWER_HAZARD_EXPOSURE" {
+			foundHazard = true
+			if r.Evidence["exposure_delta"] == nil || r.Evidence["route_id"] != "route-safe" {
+				t.Fatalf("invalid evidence in LOWER_HAZARD_EXPOSURE: %+v", r.Evidence)
+			}
+		}
+	}
+	if !foundHazard {
+		t.Fatalf("expected LOWER_HAZARD_EXPOSURE reason, got: %+v", ranked[0].RecommendationReasons)
+	}
+
+	// Case 2: Only 1 eligible route
+	singleRanked, err := engine().Rank([]Input{inputs[0]}, "normal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(singleRanked[0].RecommendationReasons) != 1 || singleRanked[0].RecommendationReasons[0].Code != "ONLY_ELIGIBLE_ROUTE" {
+		t.Fatalf("expected ONLY_ELIGIBLE_ROUTE code, got: %+v", singleRanked[0].RecommendationReasons)
+	}
+}

@@ -1,29 +1,727 @@
 {
   "openapi": "3.1.0",
-  "info": {"title":"NER-Connect AI Backend","version":"2.0.0","description":"Route planning estimates, not a guarantee of safe travel. Service-wide bearer token; not multi-user accounts. Demo inputs are synthetic. All distances km, ETAs minutes, scores 0..1 unless explicitly marked percent."},
-  "security":[{"ServiceToken":[]}],
+  "info": {
+    "title": "NER-Connect AI Backend",
+    "version": "2.0.0",
+    "description": "Route planning estimates, not a guarantee of safe travel. Authoritative route analysis endpoint is POST /api/v1/routes/analyze. Python intelligence is strictly internal. Final route ranking and exclusions owned by Go."
+  },
+  "security": [
+    {
+      "ServiceToken": []
+    }
+  ],
   "paths": {
-    "/api/v1/routes/compare":{"post":{"operationId":"compareSuppliedRoutes","description":"Offline rule-based comparison of supplied JSON features; no provider lookups, trained model or database writes. See docs/json-route-comparison.md. Excludes closed, prohibited and above-limit candidates before ranking.","requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ComparisonRequest"}}}},"responses":{"200":{"description":"Recommended route, eligible rankings, component scores, exclusions and warnings"},"400":{"description":"Invalid comparison JSON"},"422":{"description":"No eligible routes; structured comparison response with exclusions"},"401":{"$ref":"#/components/responses/Unauthorized"},"429":{"description":"Rate or concurrency limit"}}}},
-    "/health/live":{"get":{"security":[],"responses":{"200":{"description":"Process is live"}}}},
-    "/health/ready":{"get":{"security":[],"responses":{"200":{"description":"Local routing configuration and storage ready; not an upstream uptime guarantee"},"503":{"description":"Dependency unavailable"}}}},
-    "/api/v1/routes/analyze":{"post":{"operationId":"analyzeRoutes","requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/AnalyzeRequest"}}}},"responses":{"200":{"description":"Ranked routes with GeoJSON, data provenance, model mode, score breakdown, persistence flag and warnings","content":{"application/json":{"schema":{"$ref":"#/components/schemas/AnalyzeResponse"}}}},"400":{"$ref":"#/components/responses/Invalid"},"401":{"$ref":"#/components/responses/Unauthorized"},"422":{"description":"All routes blocked by known road or vehicle restrictions"},"429":{"description":"Rate or concurrency limit reached"},"503":{"description":"Routing or configured advisory feed unavailable"},"504":{"description":"Analysis deadline exceeded"}}}},
-    "/api/v1/locations":{"get":{"operationId":"listLocations","parameters":[{"name":"q","in":"query","schema":{"type":"string","maxLength":200}}],"responses":{"200":{"description":"Source-labelled catalog of 20 NER settlement centers"},"401":{"$ref":"#/components/responses/Unauthorized"}}}},
-    "/api/v1/locations/{id}/accessibility":{"post":{"operationId":"locationAccessibility","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"string"}}],"requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/AccessibilityRequest"}}}},"responses":{"200":{"description":"Location, origin, origin-dependent accessibility_score (0..100), and full route analysis"},"400":{"$ref":"#/components/responses/Invalid"},"404":{"description":"Unknown catalog location"},"422":{"description":"No eligible road route"},"503":{"description":"Routing or configured feed unavailable"}}}},
-    "/api/v1/analyses":{"get":{"operationId":"listHistory","parameters":[{"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":50,"default":20}},{"name":"offset","in":"query","schema":{"type":"integer","minimum":0,"maximum":10000,"default":0}}],"responses":{"200":{"description":"Newest-first history summaries without bulky route geometry"},"400":{"$ref":"#/components/responses/Invalid"},"401":{"$ref":"#/components/responses/Unauthorized"},"503":{"description":"History unavailable"}}}},
-    "/api/v1/analyses/{id}":{"get":{"operationId":"getAnalysis","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"Saved request and complete response"},"404":{"description":"Analysis not found"},"401":{"$ref":"#/components/responses/Unauthorized"},"503":{"description":"History unavailable"}}}},
-    "/api/v1/openapi.json":{"get":{"operationId":"getAPIContract","responses":{"200":{"description":"This OpenAPI document"}}}}
+    "/health/live": {
+      "get": {
+        "summary": "Liveness check",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Process is live"
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Readiness check with explicit dependency statuses",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "All core services operational or running in degraded fallback mode"
+          },
+          "503": {
+            "description": "Core routing or repository unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/routes/analyze": {
+      "post": {
+        "operationId": "analyzeRoutes",
+        "summary": "Authoritative route planning and risk analysis",
+        "description": "Validates request, fetches candidates, orchestrates providers, applies hard exclusions, invokes intelligence, calculates trade-off guarded scores, ranks routes, and returns exact geometries and evidence.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ranked routes with GeoJSON, data provenance, model mode, score breakdown, persistence flag and warnings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyzeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "description": "All routes blocked by known road or vehicle restrictions"
+          },
+          "429": {
+            "description": "Rate or concurrency limit reached"
+          },
+          "503": {
+            "description": "Routing or configured advisory feed unavailable"
+          },
+          "504": {
+            "description": "Analysis deadline exceeded"
+          }
+        }
+      }
+    },
+    "/api/v1/routes/compare": {
+      "post": {
+        "operationId": "compareSuppliedRoutes",
+        "summary": "Offline route comparison tool (retained for backward compatibility)",
+        "description": "Offline rule-based comparison of supplied JSON features; no provider lookups, trained model or database writes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComparisonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recommended route, eligible rankings, component scores, exclusions and warnings"
+          },
+          "400": {
+            "description": "Invalid comparison JSON"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "description": "No eligible routes; structured comparison response with exclusions"
+          },
+          "429": {
+            "description": "Rate or concurrency limit"
+          }
+        }
+      }
+    },
+    "/api/v1/tools/routes/compare-supplied": {
+      "post": {
+        "operationId": "compareSuppliedRoutesTool",
+        "summary": "Offline comparison tool alias",
+        "description": "Explicit tool path for comparing supplied candidate routes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComparisonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recommended route, eligible rankings, component scores, exclusions and warnings"
+          },
+          "400": {
+            "description": "Invalid comparison JSON"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "description": "No eligible routes; structured comparison response with exclusions"
+          }
+        }
+      }
+    },
+    "/api/v1/locations": {
+      "get": {
+        "operationId": "listLocations",
+        "summary": "Search or list Northeast India catalog locations",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Source-labelled catalog of NER settlement centers"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/locations/{id}/accessibility": {
+      "post": {
+        "operationId": "locationAccessibility",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessibilityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Location, origin, origin-dependent accessibility_score (0..100), and full route analysis"
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "404": {
+            "description": "Unknown catalog location"
+          },
+          "422": {
+            "description": "No eligible road route"
+          },
+          "503": {
+            "description": "Routing or configured feed unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/analyses": {
+      "get": {
+        "operationId": "listHistory",
+        "summary": "List route analyses for the authenticated user",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User-scoped analysis history summaries"
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "description": "History unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/analyses/{id}": {
+      "get": {
+        "operationId": "getAnalysis",
+        "summary": "Retrieve full analysis record with user authorization",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved request and complete response"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden: Record belongs to another user"
+          },
+          "404": {
+            "description": "Analysis not found"
+          },
+          "503": {
+            "description": "History unavailable"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAnalysis",
+        "summary": "Delete an analysis record with owner authorization",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analysis record deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden: Record belongs to another user"
+          },
+          "404": {
+            "description": "Analysis not found"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks": {
+      "get": {
+        "operationId": "listBookmarks",
+        "summary": "List saved route bookmarks for the authenticated user",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of user-owned bookmarks"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "saveBookmark",
+        "summary": "Save an assessment as an intentional bookmark",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveBookmarkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bookmark saved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bookmark"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Invalid"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Referenced assessment not found"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{id}": {
+      "get": {
+        "operationId": "getBookmark",
+        "summary": "Retrieve saved bookmark snapshot",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookmark record with preserved snapshot geometry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bookmark"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden: Record belongs to another user"
+          },
+          "404": {
+            "description": "Bookmark not found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteBookmark",
+        "summary": "Delete a bookmark with owner authorization",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookmark deleted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden: Record belongs to another user"
+          },
+          "404": {
+            "description": "Bookmark not found"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{id}/recalculate": {
+      "post": {
+        "operationId": "recalculateBookmark",
+        "summary": "Recalculate route with current live data",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated bookmark and new analysis with current weather and hazard conditions"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden: Record belongs to another user"
+          },
+          "404": {
+            "description": "Bookmark not found"
+          }
+        }
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "getAPIContract",
+        "summary": "Retrieve authoritative OpenAPI 3.1 contract",
+        "responses": {
+          "200": {
+            "description": "This OpenAPI document"
+          }
+        }
+      }
+    }
   },
   "components": {
-    "securitySchemes":{"ServiceToken":{"type":"http","scheme":"bearer","description":"API_TOKEN; optional only for loopback development. Never embed a service token in a public frontend."}},
-    "responses":{"Invalid":{"description":"Invalid request","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}},"Unauthorized":{"description":"Missing or invalid bearer token","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}}}},
+    "securitySchemes": {
+      "ServiceToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API_TOKEN (for service-to-service or BFF proxy) or Supabase user access JWT. Never embed service secrets in public client-side JavaScript."
+      }
+    },
+    "responses": {
+      "Invalid": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, expired or invalid bearer token",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
     "schemas": {
-      "ComparisonRequest":{"type":"object","additionalProperties":false,"required":["vehicle","cargo","priority","routes"],"properties":{"scenario_id":{"type":"string","maxLength":100},"description":{"type":"string","maxLength":1000},"origin":{"type":"string","maxLength":200},"destination":{"type":"string","maxLength":200},"data_kind":{"type":"string","enum":["synthetic","user_supplied"]},"vehicle":{"type":"string","enum":["car","truck","motorcycle","ambulance"]},"cargo":{"type":"string","enum":["general","food","medical_supplies","passengers","emergency_equipment","construction_materials","agricultural_produce"]},"priority":{"type":"string","enum":["normal","fastest","safest","emergency"]},"max_hazard_index":{"type":"number","minimum":0,"maximum":1,"default":0.8,"description":"Unvalidated policy cutoff for highest hazard index, not a probability"},"routes":{"type":"array","minItems":2,"maxItems":25,"items":{"$ref":"#/components/schemas/SuppliedRoute"}}}},
-      "SuppliedRoute":{"type":"object","additionalProperties":false,"required":["route_id","distance_km","eta_minutes","rainfall_mm","slope_deg","elevation_m","historical_landslides","road_condition_score"],"properties":{"route_id":{"type":"string","minLength":1,"maxLength":100},"distance_km":{"type":"number","minimum":0.001,"maximum":5000},"eta_minutes":{"type":"number","minimum":0.001,"maximum":10080},"rainfall_mm":{"type":"number","minimum":0,"maximum":5000},"slope_deg":{"type":"number","minimum":0,"maximum":90},"elevation_m":{"type":"number","minimum":-500,"maximum":9000},"historical_landslides":{"type":"integer","minimum":0,"maximum":1000000},"road_condition_score":{"type":"number","minimum":0,"maximum":100},"closed":{"type":"boolean"},"blocked_vehicles":{"type":"array","items":{"type":"string","enum":["car","truck","motorcycle","ambulance"]}},"delay_minutes":{"type":"number","minimum":0,"maximum":10080}}},
-      "Error":{"type":"object","required":["error"],"properties":{"error":{"type":"object","required":["code","message","request_id"],"properties":{"code":{"type":"string"},"message":{"type":"string"},"request_id":{"type":"string"}}}}},
-      "AnalyzeRequest":{"type":"object","additionalProperties":false,"required":["origin","destination","vehicle","cargo","priority"],"properties":{"origin":{"type":"string","minLength":1,"maxLength":200,"description":"Catalog ID/name or latitude,longitude"},"destination":{"type":"string","minLength":1,"maxLength":200},"vehicle":{"type":"string","enum":["car","truck","motorcycle","ambulance"]},"cargo":{"type":"string","enum":["general","food","medical_supplies","passengers","emergency_equipment"]},"priority":{"type":"string","enum":["normal","fastest","safest","emergency"]},"vehicle_dimensions":{"$ref":"#/components/schemas/VehicleDimensions"}}},
-      "AccessibilityRequest":{"type":"object","additionalProperties":false,"required":["origin","vehicle","cargo","priority"],"properties":{"origin":{"type":"string","minLength":1,"maxLength":200},"destination":{"type":"string","description":"Omit, or match the location in the URL"},"vehicle":{"type":"string","enum":["car","truck","motorcycle","ambulance"]},"cargo":{"type":"string","enum":["general","food","medical_supplies","passengers","emergency_equipment"]},"priority":{"type":"string","enum":["normal","fastest","safest","emergency"]},"vehicle_dimensions":{"$ref":"#/components/schemas/VehicleDimensions"}}},
-      "VehicleDimensions":{"type":"object","additionalProperties":false,"description":"Zero/omitted means unknown. Weight is gross loaded mass, not cargo mass. ORS driving-hgv applies these restrictions; OSRM driving does not.","properties":{"weight_t":{"type":"number","minimum":0,"maximum":200},"height_m":{"type":"number","minimum":0,"maximum":10},"width_m":{"type":"number","minimum":0,"maximum":10},"length_m":{"type":"number","minimum":0,"maximum":100},"axle_load_t":{"type":"number","minimum":0,"maximum":100}}},
-      "AnalyzeResponse":{"type":"object","required":["request_id","recommended_route_id","intelligence_mode","routes","warnings","persisted","generated_at","scoring_version"],"properties":{"request_id":{"type":"string"},"recommended_route_id":{"type":"string"},"intelligence_mode":{"type":"string","enum":["live","fallback"],"description":"Transport/orchestration mode only; inspect route.model_mode to distinguish heuristic from ml."},"routes":{"type":"array","minItems":1,"maxItems":3,"items":{"type":"object","required":["route_id","final_score","accessibility_score","reliability_score","reliability_percent","model_mode","data_quality","score_breakdown"]}},"warnings":{"type":"array","items":{"type":"string"}},"persisted":{"type":"boolean"},"generated_at":{"type":"string","format":"date-time"},"scoring_version":{"type":"string"}}}
+      "ComparisonRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["vehicle", "cargo", "priority", "routes"],
+        "properties": {
+          "scenario_id": {"type": "string", "maxLength": 100},
+          "description": {"type": "string", "maxLength": 1000},
+          "origin": {"type": "string", "maxLength": 200},
+          "destination": {"type": "string", "maxLength": 200},
+          "data_kind": {"type": "string", "enum": ["synthetic", "user_supplied"]},
+          "vehicle": {"type": "string", "enum": ["car", "truck", "motorcycle", "ambulance"]},
+          "cargo": {"type": "string", "enum": ["general", "food", "medical_supplies", "passengers", "emergency_equipment", "construction_materials", "agricultural_produce"]},
+          "priority": {"type": "string", "enum": ["normal", "fastest", "safest", "emergency"]},
+          "max_hazard_index": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.8},
+          "routes": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 25,
+            "items": {"$ref": "#/components/schemas/SuppliedRoute"}
+          }
+        }
+      },
+      "SuppliedRoute": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["route_id", "distance_km", "eta_minutes", "rainfall_mm", "slope_deg", "elevation_m", "historical_landslides", "road_condition_score"],
+        "properties": {
+          "route_id": {"type": "string", "minLength": 1, "maxLength": 100},
+          "distance_km": {"type": "number", "minimum": 0.001, "maximum": 5000},
+          "eta_minutes": {"type": "number", "minimum": 0.001, "maximum": 10080},
+          "rainfall_mm": {"type": "number", "minimum": 0, "maximum": 5000},
+          "slope_deg": {"type": "number", "minimum": 0, "maximum": 90},
+          "elevation_m": {"type": "number", "minimum": -500, "maximum": 9000},
+          "historical_landslides": {"type": "integer", "minimum": 0, "maximum": 1000000},
+          "road_condition_score": {"type": "number", "minimum": 0, "maximum": 100},
+          "closed": {"type": "boolean"},
+          "blocked_vehicles": {"type": "array", "items": {"type": "string", "enum": ["car", "truck", "motorcycle", "ambulance"]}},
+          "delay_minutes": {"type": "number", "minimum": 0, "maximum": 10080}
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "request_id"],
+            "properties": {
+              "code": {"type": "string"},
+              "message": {"type": "string"},
+              "request_id": {"type": "string"}
+            }
+          }
+        }
+      },
+      "AnalyzeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["origin", "destination", "vehicle", "cargo", "priority"],
+        "properties": {
+          "origin": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Catalog ID/name or latitude,longitude"},
+          "destination": {"type": "string", "minLength": 1, "maxLength": 200},
+          "vehicle": {"type": "string", "enum": ["car", "truck", "motorcycle", "ambulance"]},
+          "cargo": {"type": "string", "enum": ["general", "food", "medical_supplies", "passengers", "emergency_equipment"]},
+          "priority": {"type": "string", "enum": ["normal", "fastest", "safest", "emergency"]},
+          "vehicle_dimensions": {"$ref": "#/components/schemas/VehicleDimensions"}
+        }
+      },
+      "AccessibilityRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["origin", "vehicle", "cargo", "priority"],
+        "properties": {
+          "origin": {"type": "string", "minLength": 1, "maxLength": 200},
+          "destination": {"type": "string", "description": "Omit, or match the location in the URL"},
+          "vehicle": {"type": "string", "enum": ["car", "truck", "motorcycle", "ambulance"]},
+          "cargo": {"type": "string", "enum": ["general", "food", "medical_supplies", "passengers", "emergency_equipment"]},
+          "priority": {"type": "string", "enum": ["normal", "fastest", "safest", "emergency"]},
+          "vehicle_dimensions": {"$ref": "#/components/schemas/VehicleDimensions"}
+        }
+      },
+      "VehicleDimensions": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "weight_t": {"type": "number", "minimum": 0, "maximum": 200},
+          "height_m": {"type": "number", "minimum": 0, "maximum": 10},
+          "width_m": {"type": "number", "minimum": 0, "maximum": 10},
+          "length_m": {"type": "number", "minimum": 0, "maximum": 100},
+          "axle_load_t": {"type": "number", "minimum": 0, "maximum": 100}
+        }
+      },
+      "RecommendationReason": {
+        "type": "object",
+        "required": ["code", "type", "message", "evidence"],
+        "properties": {
+          "code": {"type": "string", "description": "e.g. LOWER_HAZARD_EXPOSURE, SHORTER_ETA, CLOSURE_AVOIDED, ONLY_ELIGIBLE_ROUTE"},
+          "type": {"type": "string", "description": "Category of reason"},
+          "message": {"type": "string", "description": "Truthful human-readable explanation"},
+          "evidence": {"type": "object", "description": "Structured quantitative evidence supporting the recommendation"}
+        }
+      },
+      "HazardDetail": {
+        "type": "object",
+        "required": ["availability", "method", "risk_index", "risk_level"],
+        "properties": {
+          "availability": {"type": "string", "enum": ["available", "unavailable", "degraded", "stale"]},
+          "method": {"type": "string", "enum": ["heuristic", "ml", "live_provider", "fallback"]},
+          "risk_index": {"type": "number", "minimum": 0, "maximum": 1},
+          "risk_level": {"type": "string", "enum": ["low", "moderate", "high", "severe", "unknown"]},
+          "input_completeness": {"type": "number", "minimum": 0, "maximum": 1},
+          "source_quality": {"type": "string"},
+          "model_uncertainty": {"type": "string"},
+          "validated_region": {"type": "string"},
+          "warnings": {"type": "array", "items": {"type": "string"}},
+          "feature_version": {"type": "string"},
+          "data_time": {"type": "string"}
+        }
+      },
+      "ScoredRoute": {
+        "type": "object",
+        "required": ["route_id", "distance_km", "eta_minutes", "final_score", "safety_score", "reliability_score", "accessibility_score", "model_mode", "data_quality", "score_breakdown"],
+        "properties": {
+          "route_id": {"type": "string"},
+          "distance_km": {"type": "number"},
+          "eta_minutes": {"type": "number"},
+          "final_score": {"type": "number"},
+          "safety_score": {"type": "number"},
+          "reliability_score": {"type": "number"},
+          "accessibility_score": {"type": "number"},
+          "landslide_risk": {"type": "number"},
+          "flood_risk": {"type": "number"},
+          "weather_risk": {"type": "number"},
+          "risk_level": {"type": "string"},
+          "recommendation": {"type": "string"},
+          "reason": {"type": "string"},
+          "recommendation_reasons": {"type": "array", "items": {"$ref": "#/components/schemas/RecommendationReason"}},
+          "hazards": {"type": "object", "additionalProperties": {"$ref": "#/components/schemas/HazardDetail"}},
+          "geojson": {"type": "object", "description": "GeoJSON LineString geometry"},
+          "data_quality": {"type": "object"},
+          "model_mode": {"type": "string"},
+          "reliability_percent": {"type": "number"},
+          "road_quality_score": {"type": "number"},
+          "vehicle_suitability": {"type": "string"},
+          "policy_notes": {"type": "array", "items": {"type": "string"}},
+          "score_breakdown": {"type": "object"}
+        }
+      },
+      "AnalyzeResponse": {
+        "type": "object",
+        "required": ["schema_version", "request_id", "recommended_route_id", "intelligence_mode", "routes", "warnings", "persisted", "generated_at", "scoring_version"],
+        "properties": {
+          "schema_version": {"type": "string", "example": "2.0"},
+          "request_id": {"type": "string"},
+          "recommended_route_id": {"type": "string"},
+          "intelligence_mode": {"type": "string", "enum": ["live_ml", "live_heuristic", "go_fallback", "partial", "routing_only", "demo"]},
+          "routes": {"type": "array", "minItems": 1, "maxItems": 3, "items": {"$ref": "#/components/schemas/ScoredRoute"}},
+          "recommendation_reasons": {"type": "array", "items": {"$ref": "#/components/schemas/RecommendationReason"}},
+          "warnings": {"type": "array", "items": {"type": "string"}},
+          "persisted": {"type": "boolean"},
+          "generated_at": {"type": "string", "format": "date-time"},
+          "scoring_version": {"type": "string"},
+          "owner_user_id": {"type": "string"}
+        }
+      },
+      "SaveBookmarkRequest": {
+        "type": "object",
+        "required": ["assessment_id"],
+        "properties": {
+          "assessment_id": {"type": "string"},
+          "selected_route_id": {"type": "string"},
+          "name": {"type": "string"}
+        }
+      },
+      "Bookmark": {
+        "type": "object",
+        "required": ["bookmark_id", "owner_user_id", "selected_route_id", "origin_summary", "destination_summary", "route_type", "distance_km", "eta_minutes", "assessed_at", "saved_at", "scoring_version", "snapshot_or_recalculate_status", "request"],
+        "properties": {
+          "bookmark_id": {"type": "string"},
+          "owner_user_id": {"type": "string"},
+          "assessment_id": {"type": "string"},
+          "selected_route_id": {"type": "string"},
+          "origin_summary": {"type": "string"},
+          "destination_summary": {"type": "string"},
+          "route_type": {"type": "string"},
+          "distance_km": {"type": "number"},
+          "eta_minutes": {"type": "number"},
+          "risk_level": {"type": "string"},
+          "assessed_at": {"type": "string", "format": "date-time"},
+          "saved_at": {"type": "string", "format": "date-time"},
+          "scoring_version": {"type": "string"},
+          "snapshot_or_recalculate_status": {"type": "string"},
+          "snapshot": {"$ref": "#/components/schemas/ScoredRoute"},
+          "request": {"$ref": "#/components/schemas/AnalyzeRequest"}
+        }
+      }
     }
   }
 }

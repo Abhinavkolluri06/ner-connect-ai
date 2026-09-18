@@ -42,3 +42,8 @@ __pycache__/
 /exports/
 # .idea/
 # .vscode/
+.venv/
+backend/python/.venv/
+backend/python/model_artifacts/routeguard/
+frontend/.next/
+/scratch/

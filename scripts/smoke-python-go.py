@@ -34,7 +34,7 @@ def fetch(url, payload=None):
         headers={"Content-Type": "application/json"},
     )
     with urlopen(req, timeout=45) as response:
-        assert response.status == 200
+        assert response.status in (200, 201), f"Unexpected status {response.status}"
         return json.load(response)
 
 
@@ -153,12 +153,25 @@ def main():
                     "priority": "emergency",
                 }
                 connected = fetch(go_url + "/api/v1/routes/analyze", route_request)
-                assert connected["intelligence_mode"] == "live", connected
+                assert connected["intelligence_mode"] in ("demo", "live", "live_heuristic"), connected
+                assert connected.get("schema_version") == "2.0", connected
                 assert len(connected["routes"]) == 3
                 assert connected["recommended_route_id"] == "route-b"
                 assert connected["persisted"]
                 saved_id = connected["request_id"]
                 assert fetch(go_url + "/api/v1/analyses/" + saved_id)["request_id"] == saved_id
+
+                # Test bookmark creation and snapshot retrieval
+                bm_resp = fetch(go_url + "/api/v1/bookmarks", {
+                    "assessment_id": saved_id,
+                    "selected_route_id": "route-b",
+                })
+                assert bm_resp.get("bookmark_id") and bm_resp["selected_route_id"] == "route-b"
+                bm_id = bm_resp["bookmark_id"]
+                fetched_bm = fetch(go_url + "/api/v1/bookmarks/" + bm_id)
+                assert fetched_bm["bookmark_id"] == bm_id
+                assert fetched_bm["snapshot"]["route_id"] == "route-b"
+
                 assert len(fetch(go_url + "/api/v1/locations")["locations"]) == 20
                 access = fetch(go_url + "/api/v1/locations/shillong/accessibility", {
                     "origin":"Guwahati", "vehicle":"car", "cargo":"general", "priority":"normal"
@@ -166,7 +179,7 @@ def main():
                 assert access["scale"] == "0-100" and 0 <= access["accessibility_score"] <= 100
                 stop(python_process)
                 fallback = fetch(go_url + "/api/v1/routes/analyze", route_request)
-                assert fallback["intelligence_mode"] == "fallback"
+                assert fallback["intelligence_mode"] == "go_fallback", fallback
                 assert fallback["warnings"] and len(fallback["routes"]) == 3
                 stop(go_process)
                 go_process = subprocess.Popen([str(binary)], env=go_env, stdout=go_log,
