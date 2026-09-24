@@ -72,3 +72,35 @@ export async function DELETE(
     );
   }
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const userID = await getUserID();
+  const body = await request.json();
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-User-ID": userID,
+  };
+  if (API_TOKEN) {
+    headers["Authorization"] = `Bearer ${API_TOKEN}`;
+  }
+
+  try {
+    const resp = await fetch(`${BACKEND_URL}/api/v1/bookmarks/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    return NextResponse.json(data, { status: resp.status });
+  } catch {
+    return NextResponse.json(
+      { error: { code: "UPDATE_FAILED", message: "Failed to update bookmark." } },
+      { status: 500 },
+    );
+  }
+}

@@ -5,7 +5,7 @@ const BACKEND_URL = process.env.BACKEND_API_URL || "http://127.0.0.1:8080";
 const API_TOKEN = process.env.API_TOKEN || "";
 
 // Map frontend UI names to canonical backend enum values
-function normalizeRequest(raw: any) {
+function normalizeRequest(raw: Record<string, unknown>) {
   const vehicleMap: Record<string, string> = {
     truck: "truck",
     van: "truck",
@@ -103,9 +103,9 @@ export async function POST(request: Request) {
       clearTimeout(timeout);
       const data = await resp.json();
       return NextResponse.json(data, { status: resp.status });
-    } catch (fetchErr: any) {
+    } catch (fetchErr: unknown) {
       clearTimeout(timeout);
-      const isTimeout = fetchErr.name === "AbortError";
+      const isTimeout = fetchErr instanceof Error && fetchErr.name === "AbortError";
       return NextResponse.json(
         {
           error: {
@@ -118,12 +118,13 @@ export async function POST(request: Request) {
         { status: isTimeout ? 504 : 503 },
       );
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to process route analysis request.";
     return NextResponse.json(
       {
         error: {
           code: "INTERNAL_ERROR",
-          message: err.message || "Failed to process route analysis request.",
+          message,
         },
       },
       { status: 500 },
