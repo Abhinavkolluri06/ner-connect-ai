@@ -1,3 +1,9 @@
+/**
+ * @deprecated Deprecated as of Phase 2.
+ * Live route analysis must use `analyzeRoutes` from `@/lib/api/client`.
+ * Deterministic demo fixtures are located in `@/lib/demo/fixtures`.
+ * Formatter utilities are located in `@/lib/utils/format`.
+ */
 import type {
   AccessibilityMetrics,
   BackendAnalyzeResponse,
@@ -48,6 +54,7 @@ function mapScoredRouteToOption(
   return {
     id: route.route_id,
     name: isRecommended ? `Route ${index + 1} (Recommended)` : `Route ${index + 1}`,
+    isRecommended,
     corridor: route.policy_notes?.length ? route.policy_notes.join("; ") : "Evaluated Corridor",
     distanceKm: Math.round(route.distance_km * 10) / 10,
     etaMinutes: Math.round(route.eta_minutes),
@@ -56,9 +63,9 @@ function mapScoredRouteToOption(
     status,
     reason: route.reason || (route.recommendation_reasons?.[0]?.message ?? "Evaluated highway corridor"),
     risks: {
-      landslide: Math.round(route.landslide_risk * 100),
-      flood: Math.round(route.flood_risk * 100),
-      weather: Math.round(route.weather_risk * 100),
+      landslide: typeof route.landslide_risk === "number" && !isNaN(route.landslide_risk) ? Math.round(route.landslide_risk * 100) : null,
+      flood: typeof route.flood_risk === "number" && !isNaN(route.flood_risk) ? Math.round(route.flood_risk * 100) : null,
+      weather: typeof route.weather_risk === "number" && !isNaN(route.weather_risk) ? Math.round(route.weather_risk * 100) : null,
       roadCondition: Math.round(Math.max(0, 100 - route.road_quality_score)),
     },
     coordinates: leafletCoords,

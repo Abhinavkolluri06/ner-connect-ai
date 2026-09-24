@@ -25,7 +25,7 @@ go.work
 go.work.sum
 
 # env file
-.env
+.env*
 
 # Runtime data and private provider feeds (never commit route histories or secrets)
 /data/
@@ -47,3 +47,4 @@ backend/python/.venv/
 backend/python/model_artifacts/routeguard/
 frontend/.next/
 /scratch/
+*.zip

@@ -1,3 +1,8 @@
+/**
+ * @deprecated This endpoint is deprecated as of Phase 2.
+ * Geometry is now supplied authoritatively as GeoJSON by Go backend (/api/v1/routes/analyze).
+ * Retained temporarily only for legacy API compatibility.
+ */
 import { NextResponse } from "next/server";
 
 type Place = {
@@ -385,11 +390,23 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      origin,
-      destination,
-      routes,
-    });
+    return NextResponse.json(
+      {
+        origin,
+        destination,
+        routes,
+        deprecated: true,
+        notice:
+          "Endpoint deprecated. Road geometry is provided authoritatively via /api/v1/routes/analyze.",
+      },
+      {
+        headers: {
+          "X-Deprecated": "true",
+          Warning:
+            '299 - "Endpoint deprecated. Road geometry is provided authoritatively via /api/v1/routes/analyze."',
+        },
+      },
+    );
   } catch {
     return NextResponse.json(
       {

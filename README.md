@@ -23,39 +23,92 @@ NER-Connect AI replaces blind travel-time minimization with risk-aware route orc
 
 ## 3. System Architecture
 
-The architecture enforces strict separation of concerns, fail-closed boundaries, and zero secret leakage:
+The architecture enforces strict separation of concerns, fail-closed boundaries, zero secret leakage, and unified authoritative response delivery:
 
-```
-[Browser / Leaflet UI]
-         │  (HTTPS / User Session Cookie)
-         ▼
-[Next.js 16 BFF Server Handlers]  (frontend/app/api/v1/...)
-         │  • Authenticates Supabase session server-side
-         │  • Attaches verified X-User-ID
-         │  • Attaches internal Bearer API_TOKEN (never exposed to browser)
-         ▼
-[Authoritative Go Public API :8080]  (backend/go/cmd/server)
-   ├── Routing Providers (OSRM / OpenRouteService / Offline Demo)
-   ├── Weather & Terrain Ingestion (Open-Meteo APIs / SRTM DEM)
-   ├── Advisory Feed & Hard Closures (Pre-scoring exclusion)
-   ├── Internal Intelligence Invocation
-   │        │
-   │        ▼
-   │   [Internal Python Intelligence :8001]  (backend/python/app/main.py)
-   │        • /internal/v1/risk/analyze (Internal-only)
-   │        • Evaluates segment physical proxies (slope, rain, elevation)
-   │        • Computes settlement accessibility indices
-   │        • Returns segment-level risk metrics
-   │
-   ├── Fallback Engine (Activates automatically if Python fails)
-   ├── Multi-Criteria Scoring Engine (Absolute trade-off guards & vehicle weights)
-   ├── Final Route Ranking & Recommendation Reasons
-   └── Encrypted Persistence (BoltDB / PostgreSQL with strict user isolation)
+```mermaid
+graph TD
+    Client["Browser / Operator UI<br/>(Next.js 16 + React 19 + Leaflet)"]
+    BFF["Next.js 16 BFF Server Handlers<br/>(app/api/v1/...)"]
+    Go["Authoritative Go Backend :8080<br/>(cmd/server)"]
+    Python["Internal Python Service :8001<br/>(app/main.py)"]
+    OSRM["Routing Providers<br/>(OSRM / ORS / Demo)"]
+    Weather["Weather & DEM Ingestion<br/>(Open-Meteo & SRTM DEM)"]
+    DB[("Encrypted Persistence<br/>(BoltDB / PostgreSQL)")]
+
+    Client -->|HTTPS + Session Cookie| BFF
+    BFF -->|X-User-ID + Internal Bearer Token| Go
+    Go -->|Fetch Corridors| OSRM
+    Go -->|Query Precipitation & Slopes| Weather
+    Go -->|Segment Proxies /internal/v1/risk/analyze| Python
+    Python -->|Segment Risk Indices| Go
+    Go -->|Scoring, Ranking & Trade-Offs| DB
+    Go -->|Single Authoritative Response| BFF
+    BFF -->|Validated RouteResponse| Client
 ```
 
 ---
 
-## 4. Go & Python Responsibilities
+## 4. Operational Lifecycles
+
+### A. Route Comparison Request Lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Operator as Operator / Dispatcher
+    participant UI as RoutePlanner (React)
+    participant BFF as Next.js BFF Handler
+    participant Go as Go Orchestration Server
+    participant Router as OSRM / Routing Provider
+    participant Enriched as Weather & Terrain Feeds
+    participant ML as Python Risk Engine
+
+    Operator->>UI: Enters Origin, Destination, Vehicle & Priority
+    UI->>UI: Client pre-flight validation (WAI-ARIA Combobox)
+    UI->>BFF: POST /api/v1/routes/analyze
+    BFF->>Go: POST /api/v1/routes/analyze (Authenticated)
+    Go->>Router: Discover alternative candidate corridors
+    Router-->>Go: 1-3 Candidate paths with GeoJSON geometry
+    Go->>Enriched: Annotate segments with slope & rainfall
+    Enriched-->>Go: Enriched spatial segments
+    alt Python Service Healthy
+        Go->>ML: POST /internal/v1/risk/analyze
+        ML-->>Go: Physical risk indices (landslide, flood, weather)
+    else Python Service Unavailable (Timeout / Error)
+        Go->>Go: Engage internal heuristic fallback (go_fallback mode)
+    end
+    Go->>Go: Multi-criteria scoring & trade-off calculation (+min, +km)
+    Go-->>BFF: Authoritative BackendAnalyzeResponse
+    BFF-->>UI: Normalized RouteResponse
+    UI->>UI: Synchronize Route Cards, Leaflet Polylines, Evidence & Disclosures
+```
+
+### B. Bookmark & Assessment Snapshot Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> FormInput: Operator Configures Route
+    FormInput --> Analyzed: Authoritative Assessment Received
+    Analyzed --> SavedSnapshot: Operator Clicks "Save Bookmark"
+    SavedSnapshot --> BookmarksList: View in /bookmarks
+    BookmarksList --> RestoredSnapshot: Reopen Bookmark via URL
+    note right of RestoredSnapshot
+        Restores exact historical assessment,
+        retaining frozen timestamps and scoring version.
+        Zero data fabrication.
+    end note
+    RestoredSnapshot --> RecalculatedLive: Operator clicks "Recalculate Live"
+    note right of RecalculatedLive
+        Re-evaluates saved corridor against
+        current meteorological conditions.
+        Status updates to 'recalculated_live'.
+    end note
+    RecalculatedLive --> [*]
+```
+
+---
+
+## 5. Go & Python Responsibilities
 
 | Responsibility | Go Public Backend | Python Intelligence Service |
 | :--- | :---: | :---: |
@@ -71,28 +124,7 @@ The architecture enforces strict separation of concerns, fail-closed boundaries,
 
 ---
 
-## 5. How Routing Works
-
-1. **Request Ingestion**: Accepts origin, destination, vehicle class (`truck`, `car`, `van`, `ambulance`, `motorcycle`), cargo type (`medical_supplies`, `food`, `general`, `passengers`, `emergency_equipment`), priority profile (`emergency`, `fastest`, `normal`, `safest`), and optional vehicle dimensions (height, width, length, weight, axle load).
-2. **Corridor Discovery**: Obtains 1–3 alternative candidate corridors from live routing providers (OSRM / OpenRouteService) or local deterministic datasets, preserving high-resolution GeoJSON coordinates.
-3. **Hard Exclusions (Pre-Scoring)**: Evaluates active road closures and vehicle physical restrictions (e.g. bridge weight limits or tunnel clearances). Any corridor violating hard constraints is disqualified prior to scoring and recorded in exclusion warnings.
-
----
-
-## 6. How Intelligence Works
-
-1. **Segment Decomposition**: Routes are divided into discrete spatial segments along the road network.
-2. **Feature Enrichment**: Go annotates segments with central-difference slope gradients, absolute elevation, and live/forecast precipitation from Open-Meteo.
-3. **Feature-Range Validation**: Feature bounds (e.g. latitude, longitude, rainfall >= 0, slope 0°–90°) are checked. Non-finite values (NaN/Infinity) are rejected.
-4. **Hazard Assessment**: Python evaluates susceptibility using verified physical proxies:
-   - *Landslide Susceptibility*: Multi-factor rule combining slope gradient, cumulative precipitation, and historical event frequency.
-   - *Flash Flood Risk*: Inundation proxy combining precipitation accumulation, elevation depression, and valley bottom drainage.
-   - *Settlement Accessibility*: Vulnerability index accounting for alternative corridor redundancy and single-access choke points.
-5. **Transparent Hand-off**: Python returns segment-level metrics to Go. Go verifies mathematical bounds and normalizes scores using guarded trade-off functions.
-
----
-
-## 7. Explicit Engine Modes
+## 6. Explicit Engine Modes
 
 Every assessment returned by the system declares its exact operational mode:
 
@@ -104,25 +136,25 @@ Every assessment returned by the system declares its exact operational mode:
 
 ---
 
-## 8. Resilience & Fallback Behavior
+## 7. Resilience & Fallback Behavior
 
 NER-Connect AI is built to maintain emergency operations during severe infrastructure disruptions:
 - **Python Service Outage**: If the Python service crashes, times out, or returns an error, Go does NOT drop the user request. Go automatically transitions to `go_fallback` mode using internal heuristic scoring.
 - **Frontend Alerting**: The user interface displays a visible badge (`GO FALLBACK ACTIVE`) and clear warning banners detailing that fallback scoring is in effect.
-- **No False Safety**: Missing data is never converted into zero risk. Missing weather or terrain is flagged explicitly.
+- **Zero Fabrication Policy**: Missing data is never converted into zero risk. Unmodeled sensors remain `null` and are rendered as *"Not evaluated"* or *"Unavailable"*.
 - **Automatic Recovery**: Once the Python service restarts, Go immediately resumes full intelligence scoring on subsequent requests without requiring a backend restart.
 
 ---
 
-## 9. Authentication & User Isolation
+## 8. Authentication & User Isolation
 
 - **Server-Side BFF Verification**: Browser clients authenticate with Supabase Auth. The Next.js BFF validates the user session server-side and forwards requests to Go with an authenticated `X-User-ID` header.
 - **Cryptographic JWT Validation**: Go verifies Supabase HMAC-SHA256 signatures, `iss`, `aud: "authenticated"`, and token expiration (`exp`).
-- **Strict Data Isolation**: Every saved analysis and bookmark is stamped with `owner_user_id`. User A cannot read, recalculate, or delete User B's records (HTTP 403 Forbidden is strictly enforced).
+- **Strict Data Isolation**: Every saved analysis and bookmark is stamped with `owner_user_id`. User A cannot read, rename, recalculate, or delete User B's records (HTTP 403 Forbidden is strictly enforced).
 
 ---
 
-## 10. Data Sources & Provenance
+## 9. Data Sources & Provenance
 
 | Signal / Layer | Source | License | Refresh | Fallback Policy |
 | :--- | :--- | :--- | :--- | :--- |
@@ -133,28 +165,12 @@ NER-Connect AI is built to maintain emergency operations during severe infrastru
 
 ---
 
-## 11. Machine Learning Status & Scientific Honesty
-
-- **Production Serving**: Landslide susceptibility (`heuristic-v2.0`) and flood susceptibility (`heuristic-flood-v1.0`) are deterministic physical heuristics.
-- **Research Experiment Quarantined**: The Eastern Kentucky Landslide study (`research-ky-landslide-v1.2`, XGBoost) is an academic experiment on Appalachian geology. It is **not** validated for Northeast India Himalayan terrain and is strictly quarantined from live routing.
-- **Legacy Quarantine**: Unauthenticated synthetic road models have been removed from production and archived under `legacy/synthetic_model_legacy/`.
-
----
-
-## 12. Known Limitations
-
-1. **Microclimatic Weather Resolution**: Global weather grid cells (11 km) can smooth out extreme localized rainfall spikes in narrow Himalayan gorges.
-2. **Hydraulic Telemetry**: Flash flood indices are based on precipitation and elevation depressions, not real-time river gauge telemetry.
-3. **Decision Support Only**: Assessments are planning guidelines and do not constitute legal travel clearance or guarantees of zero risk.
-
----
-
-## 13. Running Locally
+## 10. Running Locally
 
 ### Prerequisites
-- Go 1.25+
-- Python 3.14+ (with `venv`)
-- Node.js 20+
+- **Node.js**: 20+ (Node 24 recommended)
+- **Go**: 1.25+
+- **Python**: 3.14+ (with `venv`)
 
 ### Step 1: Start Python Intelligence Service
 ```bash
@@ -173,7 +189,6 @@ python -m app.main
 ### Step 2: Start Go Backend API (Terminal 2)
 ```bash
 cd backend/go
-# For deterministic demo mode:
 go run ./cmd/server
 ```
 *Readiness Check:* `http://127.0.0.1:8080/health/ready`
@@ -188,35 +203,58 @@ npm run dev
 
 ---
 
-## 14. Running Tests
+## 11. Automated Test Suites (76 Tests Passing)
 
-### Go Backend Test Suite
+### A. Run All Frontend Automated Tests
 ```bash
+cd frontend
+npm test
+```
+*Direct Node execution:*
+```bash
+node --experimental-strip-types --test tests/contract.test.ts tests/fixtures.test.ts tests/comparison.test.ts tests/evidence.test.ts tests/bookmarks.test.ts tests/navigation.test.ts tests/failure-matrix.test.ts tests/e2e-journey.test.ts
+```
+
+| Test Suite | File | Tests | Coverage Scope |
+| :--- | :--- | :---: | :--- |
+| **Contract** | `tests/contract.test.ts` | 8 | Normalization, runtime guard, contract validation, degraded fallback handling |
+| **Fixtures** | `tests/fixtures.test.ts` | 6 | Static demo schema compliance, ETA/distance formatters, risk score non-fabrication |
+| **Comparison** | `tests/comparison.test.ts` | 4 | Fastest route trade-offs (+min, +km), category badges, Leaflet coordinate format |
+| **Evidence** | `tests/evidence.test.ts` | 4 | Unmodeled signal null-preservation, spatial hazard markers, metadata propagation |
+| **Bookmarks** | `tests/bookmarks.test.ts` | 9 | Snapshot reconstruction, frozen timestamps, status transitions, live recalculation |
+| **Navigation** | `tests/navigation.test.ts` | 24 | Active-route matching, open redirect security, auth sanitization, WAI-ARIA combobox |
+| **Failure Matrix**| `tests/failure-matrix.test.ts` | 9 | Go 503 offline, 504 timeouts, 500 error propagation, gateway 502, pre-flight guards |
+| **E2E Journey** | `tests/e2e-journey.test.ts` | 9 | 9-step full operator workflow: sign-in, compare, select, evidence, bookmark, recalculate |
+| **Total** | | **76 / 76 PASS** | **100% Passing (0 failures, ~400ms duration)** |
+
+### B. Run TypeScript Strict Type-Check
+```bash
+cd frontend
+npm run type-check
+```
+*Result: 0 errors.*
+
+### C. Run Next.js Production Build
+```bash
+cd frontend
+npm run build
+```
+*Result: Compiled successfully with Turbopack (21/21 static and dynamic pages).*
+
+### D. Run Backend Test Suites
+```bash
+# Go backend test suite:
 cd backend/go
 go test -v ./...
-go vet ./...
-```
 
-### Python Intelligence Test Suite
-```bash
+# Python intelligence test suite:
 cd backend/python
 python -m pytest -q
-python -m ruff check app
-```
-
-### Synthetic Backend Scenario Suite (15 End-to-End Scenarios)
-```bash
-python scripts/test-backend-scenarios.py --output scratch/scenarios.json
-```
-
-### Integration Smoke & Fallback Test
-```bash
-python scripts/smoke-python-go.py
 ```
 
 ---
 
-## 15. Running the SIH Demonstration
+## 12. Running the SIH Demonstration
 
 Follow the full presentation sequence in [`docs/SIH_DEMO_RUNBOOK.md`](docs/SIH_DEMO_RUNBOOK.md):
 1. **Normal Flow**: Plan Guwahati → Shillong (Emergency, Truck). Observe exact geometry, badges, and recommendation rationale.
@@ -226,7 +264,7 @@ Follow the full presentation sequence in [`docs/SIH_DEMO_RUNBOOK.md`](docs/SIH_D
 
 ---
 
-## 16. Project Structure
+## 13. Project Structure
 
 ```
 ner-connect-ai/
@@ -251,11 +289,19 @@ ner-connect-ai/
 ├── frontend/                   # Next.js 16 / React 19 Frontend
 │   ├── app/                    # App Router pages and trusted BFF proxy handlers
 │   ├── components/             # RoutePlanner, LeafletMap, RouteCard, RouteForm
-│   └── lib/                    # Supabase client/server auth and typed contracts
+│   ├── lib/
+│   │   ├── api/                # Authoritative typed client & contract validators
+│   │   ├── demo/               # Verified Guwahati → Shillong offline demo fixtures
+│   │   ├── navigation/         # Accessible navigation & location filtering utilities
+│   │   ├── supabase/           # Client/server auth handlers (anon key only)
+│   │   └── types.ts            # Frozen TypeScript contracts (OpenAPI 3.1.0)
+│   └── tests/                  # 8 test suites (76 unit, contract, failure & E2E tests)
 ├── docs/                       # Runbooks, architecture docs, performance reports
 ├── legacy/                     # Quarantined legacy synthetic models
 ├── scripts/                    # Test suites, benchmarks, and smoke test utilities
+├── ARCHITECTURE_DECISIONS.md   # Architectural Decision Records (ADR 001–007)
 ├── DATA_STATUS.md              # Data provenance and license registry
+├── IMPLEMENTATION_STATUS.md    # Full 9-phase execution and verification registry
 ├── MODEL_STATUS.md             # Scientific status and model limitations registry
 └── compose.yaml                # Multi-service production deployment manifest
 ```

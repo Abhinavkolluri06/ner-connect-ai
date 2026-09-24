@@ -161,6 +161,7 @@ type AnalysisRecord struct {
 
 type Bookmark struct {
 	BookmarkID                  string         `json:"bookmark_id"`
+	Name                        string         `json:"name,omitempty"`
 	OwnerUserID                 string         `json:"owner_user_id"`
 	AssessmentID                string         `json:"assessment_id,omitempty"`
 	SelectedRouteID             string         `json:"selected_route_id"`

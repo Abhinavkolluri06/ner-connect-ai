@@ -1,31 +1,154 @@
 @import "tailwindcss";
 
 :root {
-  --background: #eef1f5;
-  --foreground: #0b1f3a;
+  --background: #F8FAF9;
+  --foreground: #0C2A40;
+  
+  --surface: #FFFFFF;
+  --surface-soft: #F5F9F7;
+  
+  --navy-950: #081F31;
+  --navy-900: #0C2A40;
+  --navy-800: #193A4E;
+  
+  --emerald-700: #087657;
+  --emerald-600: #0A9169;
+  --emerald-500: #19AA7D;
+  --emerald-100: #DEF8ED;
+  --emerald-50: #EFFBF6;
+  
+  --blue-600: #2563EB;
+  --blue-100: #DBEAFE;
+  
+  --amber-600: #D97706;
+  --amber-100: #FEF3C7;
+  
+  --violet-600: #7C3AED;
+  --violet-100: #EDE9FE;
+  
+  --text-primary: #0C2A40;
+  --text-secondary: #5C6F80;
+  --text-muted: #8696A3;
+  
+  --border-subtle: #E1E8ED;
+  --border-strong: #D2DDE4;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-ibm-plex-sans);
-  --color-navy-50: #eef3f8;
-  --color-navy-700: #16345c;
-  --color-navy-800: #102844;
-  --color-navy-900: #0b1f3a;
-  --color-navy-950: #071428;
-  --color-brand-600: #1b4f8a;
-  --color-brand-700: #164275;
-  --color-gold-300: #e4c56a;
-  --color-gold-400: #d4b45a;
+  --font-sans: var(--font-plus-jakarta-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  
+  --color-surface: #FFFFFF;
+  --color-surface-soft: #F5F9F7;
+  
+  --color-navy-950: #081F31;
+  --color-navy-900: #0C2A40;
+  --color-navy-800: #193A4E;
+  
+  --color-emerald-700: #087657;
+  --color-emerald-600: #0A9169;
+  --color-emerald-500: #19AA7D;
+  --color-emerald-100: #DEF8ED;
+  --color-emerald-50: #EFFBF6;
+  
+  --color-blue-600: #2563EB;
+  --color-blue-100: #DBEAFE;
+  
+  --color-amber-600: #D97706;
+  --color-amber-100: #FEF3C7;
+  
+  --color-violet-600: #7C3AED;
+  --color-violet-100: #EDE9FE;
+  
+  --color-border-subtle: #E1E8ED;
+  --color-border-strong: #D2DDE4;
 }
 
 html {
   scroll-behavior: smooth;
+  background-color: #F8FAF9;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-ibm-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  background-color: #F8FAF9;
+  color: #0C2A40;
+  font-family: var(--font-plus-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Subtle topographic background utility */
+.bg-topo-pattern {
+  background-image: url('/imagery/topographic-pattern.svg');
+  background-repeat: repeat;
+  background-size: 600px 600px;
+}
+
+/* Restrained soft card shadows */
+.shadow-soft {
+  box-shadow: 0 1px 3px 0 rgba(12, 42, 64, 0.03), 0 1px 2px -1px rgba(12, 42, 64, 0.02);
+}
+
+.shadow-card {
+  box-shadow: 0 4px 12px -2px rgba(12, 42, 64, 0.04), 0 2px 4px -2px rgba(12, 42, 64, 0.02);
+}
+
+.shadow-elevated {
+  box-shadow: 0 12px 24px -4px rgba(12, 42, 64, 0.06), 0 4px 8px -2px rgba(12, 42, 64, 0.03);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Leaflet Map V2 Custom Restyling (Phase 34)
+   ========================================================================== */
+.leaflet-popup-content-wrapper {
+  background: #ffffff !important;
+  border: 1px solid #e1e8ed !important;
+  border-radius: 14px !important;
+  box-shadow: 0 10px 25px -5px rgba(8, 31, 49, 0.1), 0 4px 6px -2px rgba(8, 31, 49, 0.05) !important;
+  padding: 0 !important;
+  font-family: var(--font-sans), system-ui, sans-serif !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip-container {
+  overflow: visible !important;
+}
+
+.leaflet-popup-tip {
+  background: #ffffff !important;
+  border: 1px solid #e1e8ed !important;
+  box-shadow: none !important;
+}
+
+.leaflet-tooltip.custom-route-tooltip {
+  background: #ffffff !important;
+  border: 1px solid #e1e8ed !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 12px rgba(8, 31, 49, 0.08) !important;
+  padding: 4px 8px !important;
+  font-family: var(--font-sans), system-ui, sans-serif !important;
+}
+
+.leaflet-tooltip.custom-route-tooltip::before {
+  display: none !important;
+}
+
+.cursor-crosshair .leaflet-container {
+  cursor: crosshair !important;
+}
+

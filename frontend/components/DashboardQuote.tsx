@@ -30,13 +30,16 @@ export default function DashboardQuote() {
     }
 
     window.localStorage.setItem(storageKey, String(nextIndex));
-    setQuote(quotes[nextIndex]);
+    const frameId = requestAnimationFrame(() => {
+      setQuote(quotes[nextIndex]);
+    });
+    return () => cancelAnimationFrame(frameId);
   }, []);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-navy-900 px-7 py-6 text-white shadow-sm">
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400">
-        Today's Thought
+        Today&apos;s Thought
       </p>
 
       <p className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">

@@ -127,6 +127,41 @@ func TestBookmarksAndUserIsolationAPI(t *testing.T) {
 		t.Fatalf("expected recalculated_live status, got %s", recalcResp.Bookmark.SnapshotOrRecalculateStatus)
 	}
 
+	// 7a. User B attempts to recalculate User A's bookmark -> 403 Forbidden
+	reqRecalcB := httptest.NewRequest(http.MethodPost, "/api/v1/bookmarks/"+createdBookmark.BookmarkID+"/recalculate", nil)
+	reqRecalcB.Header.Set("X-User-ID", "user-beta")
+	recRecalcB := httptest.NewRecorder()
+	h.ServeHTTP(recRecalcB, reqRecalcB)
+	if recRecalcB.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when User B recalculates User A's bookmark, got %d %s", recRecalcB.Code, recRecalcB.Body.String())
+	}
+
+	// 7b. User A renames the bookmark
+	patchPayload, _ := json.Marshal(map[string]string{"name": "Emergency Medical Corridor Alpha"})
+	reqPatchA := httptest.NewRequest(http.MethodPatch, "/api/v1/bookmarks/"+createdBookmark.BookmarkID, bytes.NewReader(patchPayload))
+	reqPatchA.Header.Set("X-User-ID", "user-alpha")
+	recPatchA := httptest.NewRecorder()
+	h.ServeHTTP(recPatchA, reqPatchA)
+	if recPatchA.Code != http.StatusOK {
+		t.Fatalf("rename bookmark failed: %d %s", recPatchA.Code, recPatchA.Body.String())
+	}
+	var patchedBookmark models.Bookmark
+	if err := json.NewDecoder(recPatchA.Body).Decode(&patchedBookmark); err != nil {
+		t.Fatalf("failed to decode patched bookmark: %v", err)
+	}
+	if patchedBookmark.Name != "Emergency Medical Corridor Alpha" {
+		t.Fatalf("expected updated name, got %s", patchedBookmark.Name)
+	}
+
+	// 7c. User B attempts to rename User A's bookmark -> 403 Forbidden
+	reqPatchB := httptest.NewRequest(http.MethodPatch, "/api/v1/bookmarks/"+createdBookmark.BookmarkID, bytes.NewReader(patchPayload))
+	reqPatchB.Header.Set("X-User-ID", "user-beta")
+	recPatchB := httptest.NewRecorder()
+	h.ServeHTTP(recPatchB, reqPatchB)
+	if recPatchB.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when User B renames User A's bookmark, got %d", recPatchB.Code)
+	}
+
 	// 8. User B attempts to delete User A's bookmark -> 403 Forbidden
 	reqDelB := httptest.NewRequest(http.MethodDelete, "/api/v1/bookmarks/"+createdBookmark.BookmarkID, nil)
 	reqDelB.Header.Set("X-User-ID", "user-beta")

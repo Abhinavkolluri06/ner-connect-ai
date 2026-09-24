@@ -54,6 +54,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/bookmarks", h.saveBookmark)
 	mux.HandleFunc("GET /api/v1/bookmarks", h.listBookmarks)
 	mux.HandleFunc("GET /api/v1/bookmarks/{id}", h.getBookmark)
+	mux.HandleFunc("PATCH /api/v1/bookmarks/{id}", h.updateBookmark)
 	mux.HandleFunc("DELETE /api/v1/bookmarks/{id}", h.deleteBookmark)
 	mux.HandleFunc("POST /api/v1/bookmarks/{id}/recalculate", h.recalculateBookmark)
 	mux.HandleFunc("GET /api/v1/openapi.json", h.openapi)
@@ -340,10 +341,16 @@ func (h *Handler) saveBookmark(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = fmt.Sprintf("%s to %s", analysis.Request.Origin, analysis.Request.Destination)
+	}
+
 	bmID := fmt.Sprintf("bm-%d", time.Now().UnixNano())
 	now := time.Now().UTC()
 	bookmark := models.Bookmark{
 		BookmarkID:                  bmID,
+		Name:                        name,
 		OwnerUserID:                 userID,
 		AssessmentID:                analysis.RequestID,
 		SelectedRouteID:             selectedRouteID,
@@ -449,6 +456,53 @@ func (h *Handler) deleteBookmark(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]any{"status": "deleted", "bookmark_id": bmID})
+}
+
+type UpdateBookmarkRequest struct {
+	Name string `json:"name"`
+}
+
+func (h *Handler) updateBookmark(w http.ResponseWriter, r *http.Request) {
+	id := middleware.RequestIDFrom(r)
+	userID := middleware.UserIDFrom(r)
+	bookmarkRepo, ok := h.Repository.(database.BookmarkRepository)
+	if !ok {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Bookmark storage is unavailable.", id)
+		return
+	}
+	bmID := r.PathValue("id")
+	bm, err := bookmarkRepo.GetBookmark(r.Context(), userID, bmID)
+	if errors.Is(err, database.ErrNotFound) {
+		writeError(w, 404, "BOOKMARK_NOT_FOUND", "Bookmark not found.", id)
+		return
+	}
+	if errors.Is(err, database.ErrUnauthorized) {
+		writeError(w, 403, "FORBIDDEN", "You do not have permission to update this bookmark.", id)
+		return
+	}
+	if err != nil {
+		writeError(w, 503, "BOOKMARKS_UNAVAILABLE", "Could not read bookmark.", id)
+		return
+	}
+
+	var req UpdateBookmarkRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, 400, "INVALID_REQUEST", "Invalid request body.", id)
+		return
+	}
+	newName := strings.TrimSpace(req.Name)
+	if newName == "" {
+		writeError(w, 400, "INVALID_REQUEST", "Bookmark name cannot be empty.", id)
+		return
+	}
+
+	bm.Name = newName
+	if err := bookmarkRepo.SaveBookmark(r.Context(), bm); err != nil {
+		writeError(w, 500, "DATABASE_ERROR", "Could not update bookmark.", id)
+		return
+	}
+
+	writeJSON(w, 200, bm)
 }
 
 func (h *Handler) recalculateBookmark(w http.ResponseWriter, r *http.Request) {
