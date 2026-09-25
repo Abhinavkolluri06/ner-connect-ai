@@ -1,4 +1,8 @@
-import type { CargoType, PriorityLevel, VehicleType } from "./types";
+import type {
+  CargoType,
+  PriorityLevel,
+  VehicleType,
+} from "./types";
 
 export const originOptions = [
   "Guwahati",
@@ -13,7 +17,8 @@ export const originOptions = [
 
 export const destinationOptions = originOptions;
 
-export const vehicleOptions: VehicleType[] = [
+export const VEHICLE_OPTIONS: VehicleType[] = [
+  "Bus",
   "Truck",
   "Van",
   "Ambulance",

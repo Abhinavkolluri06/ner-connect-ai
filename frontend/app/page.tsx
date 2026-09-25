@@ -1,16 +1,5 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-
-import Dashboard from "@/components/Dashboard";
-
-export const metadata: Metadata = {
-  title: "Dashboard",
-};
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return (
-    <Suspense fallback={null}>
-      <Dashboard />
-    </Suspense>
-  );
+  redirect("/accessibility");
 }

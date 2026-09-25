@@ -1,396 +1,571 @@
-/**
- * Comprehensive TypeScript Data Contracts for NER-Connect AI
- *
- * Generated and validated against backend OpenAPI 3.1.0 and Go models.
- * Authoritative backend endpoint: POST /api/v1/routes/analyze
- * Offline tool endpoint: POST /api/v1/routes/compare
- */
+/* ========================================================================== */
+/* FRONTEND SELECT VALUES                                                     */
+/* ========================================================================== */
 
-// ============================================================================
-// 1. Core Enumerations & Canonical Domain Values
-// ============================================================================
+export type VehicleType =
+  | "Bus"
+  | "Truck"
+  | "Van"
+  | "Ambulance"
+  | "Light vehicle";
 
-/** UI representation of vehicle classes */
-export type VehicleType = "Truck" | "Van" | "Ambulance" | "Light vehicle";
-
-/** Canonical Go backend vehicle enum */
-export type BackendVehicle = "car" | "truck" | "motorcycle" | "ambulance";
-
-/** UI representation of cargo types */
 export type CargoType =
   | "Medical Supplies"
   | "Food & Relief"
   | "Fuel"
   | "General Cargo";
 
-/** Canonical Go backend cargo enum */
+export type PriorityLevel =
+  | "Emergency"
+  | "High"
+  | "Standard";
+
+
+/* ========================================================================== */
+/* BACKEND / MOCK VALUES                                                      */
+/* ========================================================================== */
+
+export type BackendVehicle =
+  | "bus"
+  | "truck"
+  | "van"
+  | "ambulance"
+  | "car"
+  | "motorcycle";
+
 export type BackendCargo =
-  | "general"
-  | "food"
   | "medical_supplies"
+  | "food"
+  | "fuel"
+  | "general"
   | "passengers"
   | "emergency_equipment";
 
-/** UI representation of priority levels */
-export type PriorityLevel = "Emergency" | "High" | "Standard";
+export type BackendPriority =
+  | "emergency"
+  | "fastest"
+  | "normal"
+  | "safest";
 
-/** Canonical Go backend priority enum */
-export type BackendPriority = "normal" | "fastest" | "safest" | "emergency";
 
-/** Backend intelligence operational modes */
-export type IntelligenceMode =
-  | "live_ml"
-  | "live_heuristic"
-  | "go_fallback"
-  | "partial"
-  | "routing_only"
-  | "demo";
+/* ========================================================================== */
+/* ROUTE REQUEST                                                              */
+/* ========================================================================== */
 
-/** Hazard signal availability status */
-export type HazardAvailability =
-  | "available"
-  | "unavailable"
-  | "degraded"
-  | "stale";
+export type RouteRequest = {
+  origin: string;
+  destination: string;
+  vehicle: VehicleType | "";
+  cargo: CargoType | "";
+  priority: PriorityLevel | "";
+};
 
-/** Hazard computation method */
-export type HazardMethod =
-  | "heuristic"
-  | "ml"
-  | "live_provider"
-  | "fallback"
-  | "rule"
-  | "unavailable";
 
-/** Qualitative hazard risk levels */
+/* ========================================================================== */
+/* VEHICLE DIMENSIONS                                                         */
+/* ========================================================================== */
+
+export type VehicleDimensions = {
+  weightT?: number;
+  heightM?: number;
+  widthM?: number;
+  lengthM?: number;
+  axleLoadT?: number;
+};
+
+
+/* ========================================================================== */
+/* MAP TYPES                                                                  */
+/* ========================================================================== */
+
+export type LeafletCoordinate = number[];
+
+export type HazardMarker = {
+  id?: string;
+  latitude?: number;
+  longitude?: number;
+  coordinate?: LeafletCoordinate;
+
+  type?: string;
+  title?: string;
+  name?: string;
+  description?: string;
+  severity?: string;
+  score?: number | null;
+};
+
+export type RouteCategory =
+  | "fastest"
+  | "recommended"
+  | "alternative"
+  | "higher_risk"
+  | "alternate";
+
+
+/* ========================================================================== */
+/* RISK                                                                       */
+/* ========================================================================== */
+
 export type HazardRiskLevel =
   | "low"
   | "moderate"
   | "high"
-  | "severe"
-  | "unknown";
+  | "critical";
 
-/** Source quality evaluation */
-export type SourceQuality =
-  | "high"
-  | "medium"
-  | "low"
-  | "unverified"
-  | "unavailable";
-
-/** Regional model validation classification */
-export type ValidatedRegion =
-  | "not_regionally_validated"
-  | "kentucky_research_only"
-  | "ner_validated";
-
-// ============================================================================
-// 2. Request Structures
-// ============================================================================
-
-/** Frontend UI route form inputs */
-export type RouteRequest = {
-  origin: string;
-  destination: string;
-  vehicle: VehicleType;
-  cargo: CargoType;
-  priority: PriorityLevel;
+export type RiskBreakdownScores = {
+  landslide: number;
+  flood: number;
+  weather: number;
+  roadCondition: number;
 };
 
-/** Physical vehicle constraints for clearance and bridge loading */
-export type VehicleDimensions = {
-  weight_t?: number;
-  height_m?: number;
-  width_m?: number;
-  length_m?: number;
-  axle_load_t?: number;
+export type HazardDetail = {
+  id?: string;
+  name?: string;
+  title?: string;
+  category?: string;
+
+  description?: string;
+
+  score?: number | null;
+  risk?: number | null;
+  exposure?: number | null;
+
+  level?: HazardRiskLevel | string;
+
+  method?: string;
+
+  latitude?: number;
+  longitude?: number;
+
+  [key: string]: any;
 };
 
-/** Authoritative backend request payload for POST /api/v1/routes/analyze */
+
+/* ========================================================================== */
+/* DATA QUALITY                                                               */
+/* ========================================================================== */
+
+export type DataQuality = {
+  routingSource?: string;
+  routing_source?: string;
+
+  weatherSource?: string;
+  weather_source?: string;
+
+  terrainSource?: string;
+  terrain_source?: string;
+
+  historySource?: string;
+  history_source?: string;
+
+  roadSource?: string;
+  road_source?: string;
+
+  retrievedAt?: string;
+  retrieved_at?: string;
+
+  weatherStart?: string;
+  weather_start?: string;
+
+  weatherEnd?: string;
+  weather_end?: string;
+
+  featureCoverage?: number;
+  feature_coverage?: number;
+
+  missingFeatures?: string[];
+  missing_features?: string[];
+
+  warnings?: string[];
+
+  [key: string]: any;
+};
+
+
+/* ========================================================================== */
+/* RECOMMENDATION                                                             */
+/* ========================================================================== */
+
+export type RecommendationReason = {
+  title?: string;
+  body?: string;
+  points?: string[];
+  code?: string;
+  category?: string;
+  impact?: number;
+  scoreImpact?: number;
+
+  [key: string]: any;
+};
+
+
+/* ========================================================================== */
+/* ROUTE STATUS                                                               */
+/* ========================================================================== */
+
+export type RouteStatus =
+  | "recommended"
+  | "higher_risk"
+  | "alternate";
+
+
+/* ========================================================================== */
+/* ROUTE OPTION                                                               */
+/* ========================================================================== */
+
+export type RouteOption = {
+  id: string;
+
+  name: string;
+
+  corridor?: string;
+
+  category?: RouteCategory | string;
+
+  distanceKm: number;
+
+  etaMinutes: number;
+
+  overallRisk: number;
+
+  reliability: number;
+
+  status: RouteStatus;
+
+  reason: string;
+
+  risks: RiskBreakdownScores;
+
+  geometry?: string;
+
+  geojson?: {
+    type: "LineString";
+    coordinates: number[][];
+  };
+
+  coordinates?: number[][];
+
+  markers?: HazardMarker[];
+
+  hazards?: HazardDetail[];
+
+  finalScore?: number;
+
+  safetyScore?: number;
+
+  reliabilityScore?: number;
+
+  accessibilityScore?: number;
+
+  landslideRisk?: number;
+
+  floodRisk?: number;
+
+  weatherRisk?: number;
+
+  roadQualityScore?: number;
+
+  reliabilityPercent?: number;
+
+  vehicleSuitability?: string;
+
+  policyNotes?: string[];
+
+  recommendation?: string;
+
+  isRecommended?: boolean;
+
+  isFastest?: boolean;
+
+  recommendationReasons?: RecommendationReason[];
+
+  addedMinutesComparedToFastest?: number;
+
+  dataQuality?: DataQuality;
+
+  modelMode?: string;
+
+  scoreBreakdown?: Record<string, number>;
+
+  reliability_score?: number;
+
+  safety_score?: number;
+
+  accessibility_score?: number;
+
+  [key: string]: any;
+};
+
+
+/* ========================================================================== */
+/* ACCESSIBILITY                                                              */
+/* ========================================================================== */
+
+export type AccessibilityMetrics = {
+  score: number;
+
+  roadAccessibility: number;
+
+  essentialServicesProximity: number;
+
+  terrainDifficulty: number;
+
+  notes: string;
+
+  status?: string;
+
+  [key: string]: any;
+};
+
+
+/* ========================================================================== */
+/* BOOKMARK                                                                   */
+/* ========================================================================== */
+
+export type Bookmark = {
+  id?: string;
+
+  bookmark_id?: string;
+
+  title?: string;
+
+  name?: string;
+
+  origin?: string;
+
+  destination?: string;
+
+  origin_summary?: string;
+
+  destination_summary?: string;
+
+  vehicle?: VehicleType | string;
+
+  cargo?: CargoType | string;
+
+  priority?: PriorityLevel | string;
+
+  routeId?: string;
+
+  route_id?: string;
+
+  selected_route_id?: string;
+
+  createdAt?: string;
+
+  created_at?: string;
+
+  assessed_at?: string;
+
+  saved_at?: string;
+
+  scoring_version?: string;
+
+  snapshot?: any;
+
+  request?: AnalyzeRequest;
+
+  [key: string]: any;
+};
+
+
+/* ========================================================================== */
+/* ANALYZE REQUEST                                                            */
+/* ========================================================================== */
+
 export type AnalyzeRequest = {
   origin: string;
+
   destination: string;
-  vehicle: BackendVehicle;
-  cargo: BackendCargo;
-  priority: BackendPriority;
+
+  vehicle: string;
+
+  cargo: string;
+
+  priority: string;
+
   vehicle_dimensions?: VehicleDimensions;
 };
 
-// ============================================================================
-// 3. Geometry & Spatial Representation
-// ============================================================================
 
-/** Standard GeoJSON LineString geometry returned by backend */
-export type GeoJSONLineString = {
-  type: "LineString" | string;
-  coordinates: Array<[number, number]>; // [longitude, latitude]
-};
+/* ========================================================================== */
+/* BACKEND ROUTE                                                              */
+/* ========================================================================== */
 
-/** Leaflet coordinate pair [latitude, longitude] */
-export type LeafletCoordinate = [number, number];
-
-// ============================================================================
-// 4. Intelligence & Scoring Contracts
-// ============================================================================
-
-/** Structured evidence supporting route recommendation */
-export type RecommendationReason = {
-  code: string;
-  type: string;
-  message: string;
-  evidence?: Record<string, unknown>;
-};
-
-/** Detailed hazard breakdown per route candidate */
-export type HazardDetail = {
-  availability: HazardAvailability;
-  method: HazardMethod;
-  risk_index: number; // 0..1
-  risk_level: HazardRiskLevel;
-  input_completeness: number; // 0..1
-  source_quality: SourceQuality | string;
-  model_uncertainty: string;
-  validated_region: ValidatedRegion | string;
-  warnings?: string[];
-  feature_version?: string;
-  model_version?: string;
-  data_time?: string;
-};
-
-/** Data provenance and sensor freshness metadata */
-export type DataQuality = {
-  routing_source: string;
-  weather_source: string;
-  terrain_source: string;
-  history_source: string;
-  road_source: string;
-  retrieved_at: string;
-  weather_start?: string;
-  weather_end?: string;
-  weather_arrival_aware?: boolean;
-  feature_coverage: number;
-  missing_features: string[];
-  warnings: string[];
-};
-
-/** Authoritative route candidate scored and ranked by Go */
-export type BackendScoredRoute = {
+export type BackendRoute = {
   route_id: string;
+
   distance_km: number;
+
   eta_minutes: number;
-  final_score: number;
-  safety_score: number;
-  reliability_score: number;
-  accessibility_score: number;
-  landslide_risk: number | null;
-  flood_risk: number | null;
-  weather_risk: number | null;
-  risk_level?: string;
-  recommendation: string;
-  reason: string;
-  recommendation_reasons?: RecommendationReason[];
-  hazards?: Record<string, HazardDetail>;
-  geojson?: GeoJSONLineString;
+
+  final_score?: number;
+
+  safety_score?: number;
+
+  reliability_score?: number;
+
+  accessibility_score?: number;
+
+  landslide_risk?: number;
+
+  flood_risk?: number;
+
+  weather_risk?: number;
+
+  recommendation?: string;
+
+  reason?: string;
+
+  geojson?: {
+    type: "LineString";
+
+    coordinates: number[][];
+  };
+
+  reliability_percent?: number;
+
+  road_quality_score?: number;
+
+  vehicle_suitability?: string;
+
+  policy_notes?: string[];
+
+  score_breakdown?: Record<string, number>;
+
   data_quality?: DataQuality;
-  model_mode: string;
-  reliability_percent: number;
-  road_quality_score: number;
-  vehicle_suitability: string;
-  policy_notes: string[];
-  score_breakdown: Record<string, number>;
+
+  model_mode?: string;
+
+  [key: string]: any;
 };
 
-/** Authoritative backend response for POST /api/v1/routes/analyze */
+
+/* ========================================================================== */
+/* BACKEND ANALYZE RESPONSE                                                   */
+/* ========================================================================== */
+
 export type BackendAnalyzeResponse = {
-  schema_version: string;
   request_id: string;
+
   recommended_route_id: string;
-  intelligence_mode: IntelligenceMode;
-  routes: BackendScoredRoute[];
-  recommendation_reasons?: RecommendationReason[];
+
+  intelligence_mode: string;
+
+  routes: BackendRoute[];
+
   warnings: string[];
+
   persisted: boolean;
+
   generated_at: string;
+
   scoring_version: string;
-  owner_user_id?: string;
+
+  [key: string]: any;
 };
 
-// ============================================================================
-// 5. Offline Supplied-Features Comparison Tool Contracts
-// ============================================================================
 
-export type SuppliedRoute = {
-  route_id: string;
-  distance_km: number;
-  eta_minutes: number;
-  rainfall_mm: number;
-  slope_deg: number;
-  elevation_m: number;
-  historical_landslides: number;
-  road_condition_score: number;
-  closed?: boolean;
-  blocked_vehicles?: BackendVehicle[];
-  delay_minutes?: number;
-};
+/* ========================================================================== */
+/* FRONTEND ROUTE RESPONSE                                                    */
+/* ========================================================================== */
 
-export type ComparisonRequest = {
-  scenario_id?: string;
-  description?: string;
-  data_kind?: "synthetic" | "user_supplied";
-  origin?: string;
-  destination?: string;
-  vehicle: BackendVehicle;
-  cargo: BackendCargo;
-  priority: BackendPriority;
-  max_hazard_index?: number;
-  routes: SuppliedRoute[];
-};
-
-// ============================================================================
-// 6. Bookmarks & Saved Assessments
-// ============================================================================
-
-export type SaveBookmarkRequest = {
-  assessment_id: string;
-  selected_route_id?: string;
-  name?: string;
-};
-
-export type UpdateBookmarkRequest = {
-  name: string;
-};
-
-export type Bookmark = {
-  bookmark_id: string;
-  name?: string;
-  owner_user_id: string;
-  assessment_id?: string;
-  selected_route_id: string;
-  origin_summary: string;
-  destination_summary: string;
-  route_type: string;
-  distance_km: number;
-  eta_minutes: number;
-  risk_level: string;
-  assessed_at: string;
-  saved_at: string;
-  scoring_version: string;
-  snapshot_or_recalculate_status: "snapshot_saved" | "recalculated_live" | string;
-  snapshot?: BackendScoredRoute;
-  request: AnalyzeRequest;
-};
-
-export type BookmarkListResponse = {
-  bookmarks: Bookmark[];
-  limit: number;
-  offset: number;
-  count: number;
-};
-
-export type RecalculateBookmarkResponse = {
-  bookmark: Bookmark;
-  analysis: BackendAnalyzeResponse;
-};
-
-// ============================================================================
-// 7. Error & Diagnostic Payloads
-// ============================================================================
-
-export type ApiErrorBody = {
-  code: string;
-  message: string;
-  request_id: string;
-};
-
-export type ApiErrorResponse = {
-  error: ApiErrorBody;
-};
-
-// ============================================================================
-// 8. Frontend UI Presentation Models
-// ============================================================================
-
-export type RouteCategory = "fastest" | "recommended" | "alternative" | "higher_risk";
-export type RouteStatus = "recommended" | "higher_risk" | "alternate";
-
-export type RiskBreakdownScores = {
-  landslide: number | null;
-  flood: number | null;
-  weather: number | null;
-  roadCondition: number | null;
-};
-
-export type AccessibilityMetrics = {
-  score: number | null;
-  roadAccessibility: number | null;
-  essentialServicesProximity?: number | null;
-  terrainDifficulty?: number | null;
-  status?: "Available" | "Experimental" | "Not evaluated" | "Unavailable" | "Unsupported";
-  notes: string;
-};
-
-/** Spatial hazard point along a corridor route */
-export type HazardMarker = {
-  id: string;
-  coordinate: LeafletCoordinate;
-  type: "landslide" | "flood" | "weather" | "road_condition" | "closure";
-  severity: "low" | "medium" | "high" | "severe";
-  label: string;
-  description: string;
-};
-
-/** Normalized route candidate for cards and map display */
-export type RouteOption = {
-  id: string;
-  name: string;
-  category?: RouteCategory;
-  status?: RouteStatus;
-  isRecommended: boolean;
-  isFastest?: boolean;
-  corridor?: string;
-  distanceKm: number;
-  etaMinutes: number;
-  addedMinutesComparedToFastest?: number;
-  addedKmComparedToFastest?: number;
-  overallRisk: number;
-  overallRiskScore?: number | null; // Nullable if uncomputed
-  overallRiskLevel?: HazardRiskLevel | "unknown";
-  reliability: number;
-  reason: string;
-  recommendationReasons?: RecommendationReason[];
-  risks: RiskBreakdownScores;
-  hazards?: Record<string, HazardDetail>;
-  hazardMarkers?: HazardMarker[];
-  coordinates?: LeafletCoordinate[];
-  geojson?: GeoJSONLineString;
-  dataQuality?: DataQuality;
-  modelMode?: string;
-  riskLevel?: string;
-  roadQualityScore?: number;
-  vehicleSuitability?: string;
-  policyNotes?: string[];
-  scoreBreakdown?: Record<string, number>;
-};
-
-/** High-level authoritative route response for UI components */
 export type RouteResponse = {
-  origin: string;
-  destination: string;
-  vehicle: VehicleType;
-  cargo: CargoType;
-  priority: PriorityLevel;
-  generatedAt: string;
-  recommendedRouteId: string;
-  fastestRouteId?: string;
-  explanation: string;
-  routes: RouteOption[];
-  accessibility: AccessibilityMetrics;
   requestId?: string;
-  schemaVersion?: string;
-  intelligenceMode?: IntelligenceMode;
-  recommendationReasons?: RecommendationReason[];
+
+  request_id?: string;
+
+  origin: string;
+
+  destination: string;
+
+  vehicle: VehicleType | "";
+
+  cargo: CargoType | "";
+
+  priority: PriorityLevel | "";
+
+  generatedAt?: string;
+
+  generated_at?: string;
+
+  recommendedRouteId: string;
+
+  recommended_route_id?: string;
+
+  explanation: string;
+
+  routes: RouteOption[];
+
+  accessibility?: AccessibilityMetrics;
+
   warnings?: string[];
+
+  persisted?: boolean;
+
   scoringVersion?: string;
+
+  scoring_version?: string;
+
+  intelligenceMode?: IntelligenceMode;
+
   isFallback?: boolean;
+
   fallbackNotice?: string;
+
+  recommendationReasons?: RecommendationReason[];
+
+  [key: string]: any;
+};
+
+
+/* ========================================================================== */
+/* BACKEND RISK RESPONSE                                                      */
+/* ========================================================================== */
+
+export type BackendRiskResponse = {
+  route_id: string;
+
+  landslide_risk: number;
+
+  flood_risk: number;
+
+  weather_risk: number;
+
+  accessibility_score: number;
+
+  confidence: number;
+
+  model_mode?: string;
+
+  [key: string]: any;
+};
+
+
+/* ========================================================================== */
+/* INTELLIGENCE MODE                                                          */
+/* ========================================================================== */
+
+export type IntelligenceMode =
+  | "demo"
+  | "go_fallback"
+  | "live"
+  | "unknown";
+
+
+/* ========================================================================== */
+/* ANALYSIS RECORD                                                            */
+/* ========================================================================== */
+
+export type AnalysisRecord = {
+  requestId: string;
+
+  request: AnalyzeRequest;
+
+  response: BackendAnalyzeResponse;
+
+  createdAt: string;
+
+  [key: string]: any;
 };

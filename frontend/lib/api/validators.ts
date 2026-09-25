@@ -1,10 +1,3 @@
-/**
- * Runtime Validators and Data Transformers for NER-Connect AI
- *
- * Enforces contract integrity between Go backend responses and frontend UI state.
- * Prevents semantic degradation: missing data is NEVER coerced to zero.
- */
-
 import type {
   AnalyzeRequest,
   BackendAnalyzeResponse,
@@ -24,331 +17,818 @@ import type {
   RouteResponse,
   VehicleDimensions,
   VehicleType,
-} from "../types.ts";
+} from "../types";
 
-// ============================================================================
-// 1. Request Normalization (UI -> Backend)
-// ============================================================================
+/* -------------------------------------------------------------------------- */
+/* UI -> Backend mappings                                                     */
+/* -------------------------------------------------------------------------- */
 
-const VEHICLE_MAP: Record<VehicleType, BackendVehicle> = {
+const VEHICLE_MAP: Record<
+  VehicleType,
+  BackendVehicle
+> = {
+  Bus: "bus",
   Truck: "truck",
   Van: "truck",
   Ambulance: "ambulance",
   "Light vehicle": "car",
 };
 
-const CARGO_MAP: Record<CargoType, BackendCargo> = {
-  "Medical Supplies": "medical_supplies",
+const CARGO_MAP: Record<
+  CargoType,
+  BackendCargo
+> = {
+  "Medical Supplies":
+    "medical_supplies",
+
   "Food & Relief": "food",
+
   Fuel: "general",
+
   "General Cargo": "general",
 };
 
-const PRIORITY_MAP: Record<PriorityLevel, BackendPriority> = {
+const PRIORITY_MAP: Record<
+  PriorityLevel,
+  BackendPriority
+> = {
   Emergency: "emergency",
+
   High: "fastest",
+
   Standard: "normal",
 };
+
+/* -------------------------------------------------------------------------- */
+/* Request normalization                                                      */
+/* -------------------------------------------------------------------------- */
 
 export function normalizeRequest(
   request: RouteRequest,
   dimensions?: VehicleDimensions,
 ): AnalyzeRequest {
-  const origin = request.origin.trim();
-  const destination = request.destination.trim();
+  const origin =
+    request.origin.trim();
 
-  if (!origin || !destination) {
-    throw new Error("Origin and destination are required.");
+  const destination =
+    request.destination.trim();
+
+  if (!origin) {
+    throw new Error(
+      "Origin is required.",
+    );
+  }
+
+  if (!destination) {
+    throw new Error(
+      "Destination is required.",
+    );
+  }
+
+  if (!request.vehicle) {
+    throw new Error(
+      "Vehicle type is required.",
+    );
+  }
+
+  if (!request.cargo) {
+    throw new Error(
+      "Cargo type is required.",
+    );
+  }
+
+  if (!request.priority) {
+    throw new Error(
+      "Routing priority is required.",
+    );
+  }
+
+  const vehicle =
+    VEHICLE_MAP[request.vehicle];
+
+  const cargo =
+    CARGO_MAP[request.cargo];
+
+  const priority =
+    PRIORITY_MAP[request.priority];
+
+  if (!vehicle) {
+    throw new Error(
+      "Invalid vehicle type.",
+    );
+  }
+
+  if (!cargo) {
+    throw new Error(
+      "Invalid cargo type.",
+    );
+  }
+
+  if (!priority) {
+    throw new Error(
+      "Invalid routing priority.",
+    );
   }
 
   return {
     origin,
     destination,
-    vehicle: VEHICLE_MAP[request.vehicle] || "truck",
-    cargo: CARGO_MAP[request.cargo] || "general",
-    priority: PRIORITY_MAP[request.priority] || "normal",
-    vehicle_dimensions: dimensions,
+    vehicle,
+    cargo,
+    priority,
+    vehicle_dimensions:
+      dimensions,
   };
 }
 
-// ============================================================================
-// 2. Response Validation (Backend Runtime Guard)
-// ============================================================================
+/* -------------------------------------------------------------------------- */
+/* Response validation                                                        */
+/* -------------------------------------------------------------------------- */
 
-export class ContractValidationError extends Error {
+export class ContractValidationError
+  extends Error {
   readonly details?: unknown;
 
-  constructor(message: string, details?: unknown) {
-    super(`ContractValidationError: ${message}`);
-    this.name = "ContractValidationError";
+  constructor(
+    message: string,
+    details?: unknown,
+  ) {
+    super(
+      `ContractValidationError: ${message}`,
+    );
+
+    this.name =
+      "ContractValidationError";
+
     this.details = details;
   }
 }
 
-export function validateAnalyzeResponse(data: unknown): BackendAnalyzeResponse {
-  if (!data || typeof data !== "object") {
-    throw new ContractValidationError("Response must be an object");
-  }
-
-  const res = data as Partial<BackendAnalyzeResponse>;
-
-  if (!res.request_id || typeof res.request_id !== "string") {
-    throw new ContractValidationError("Missing or invalid 'request_id'");
-  }
-
-  if (!res.recommended_route_id || typeof res.recommended_route_id !== "string") {
-    throw new ContractValidationError("Missing or invalid 'recommended_route_id'");
-  }
-
-  if (!Array.isArray(res.routes) || res.routes.length === 0) {
-    throw new ContractValidationError("Response must contain a non-empty 'routes' array");
-  }
-
-  const validIds = new Set<string>();
-  for (const r of res.routes) {
-    if (!r.route_id || typeof r.route_id !== "string") {
-      throw new ContractValidationError("Each route must have a valid 'route_id'");
-    }
-    if (typeof r.distance_km !== "number" || isNaN(r.distance_km)) {
-      throw new ContractValidationError(`Route ${r.route_id} has invalid distance_km`);
-    }
-    if (typeof r.eta_minutes !== "number" || isNaN(r.eta_minutes)) {
-      throw new ContractValidationError(`Route ${r.route_id} has invalid eta_minutes`);
-    }
-    validIds.add(r.route_id);
-  }
-
-  if (!validIds.has(res.recommended_route_id)) {
+export function validateAnalyzeResponse(
+  data: unknown,
+): BackendAnalyzeResponse {
+  if (
+    !data ||
+    typeof data !== "object"
+  ) {
     throw new ContractValidationError(
-      `recommended_route_id '${res.recommended_route_id}' does not match any candidate route`,
+      "Response must be an object.",
+    );
+  }
+
+  const response =
+    data as Partial<BackendAnalyzeResponse>;
+
+  if (
+    !response.request_id ||
+    typeof response.request_id !==
+      "string"
+  ) {
+    throw new ContractValidationError(
+      "Missing request_id.",
+    );
+  }
+
+  if (
+    !response.recommended_route_id ||
+    typeof response.recommended_route_id !==
+      "string"
+  ) {
+    throw new ContractValidationError(
+      "Missing recommended_route_id.",
+    );
+  }
+
+  if (
+    !Array.isArray(response.routes) ||
+    response.routes.length === 0
+  ) {
+    throw new ContractValidationError(
+      "Response contains no routes.",
+    );
+  }
+
+  const ids = new Set<string>();
+
+  for (const route of response.routes) {
+    if (
+      !route.route_id ||
+      typeof route.route_id !==
+        "string"
+    ) {
+      throw new ContractValidationError(
+        "Route is missing route_id.",
+      );
+    }
+
+    if (
+      typeof route.distance_km !==
+        "number" ||
+      Number.isNaN(
+        route.distance_km,
+      )
+    ) {
+      throw new ContractValidationError(
+        `Invalid distance for ${route.route_id}.`,
+      );
+    }
+
+    if (
+      typeof route.eta_minutes !==
+        "number" ||
+      Number.isNaN(
+        route.eta_minutes,
+      )
+    ) {
+      throw new ContractValidationError(
+        `Invalid ETA for ${route.route_id}.`,
+      );
+    }
+
+    ids.add(route.route_id);
+  }
+
+  if (
+    !ids.has(
+      response.recommended_route_id,
+    )
+  ) {
+    throw new ContractValidationError(
+      "Recommended route does not exist in routes.",
     );
   }
 
   return data as BackendAnalyzeResponse;
 }
 
-// ============================================================================
-// 3. Response Transformation (Backend -> Clean UI State)
-// ============================================================================
+/* -------------------------------------------------------------------------- */
+/* Backend -> UI                                                             */
+/* -------------------------------------------------------------------------- */
 
 export function transformToRouteResponse(
   rawResponse: BackendAnalyzeResponse,
   originalRequest: RouteRequest,
 ): RouteResponse {
-  const analysis = validateAnalyzeResponse(rawResponse);
-  const { routes: backendRoutes, recommended_route_id } = analysis;
+  const analysis =
+    validateAnalyzeResponse(
+      rawResponse,
+    );
 
-  // Identify fastest route
-  let fastestRoute = backendRoutes[0];
-  for (const r of backendRoutes) {
-    if (r.eta_minutes < fastestRoute.eta_minutes) {
-      fastestRoute = r;
+  const backendRoutes =
+    analysis.routes;
+
+  let fastestRoute =
+    backendRoutes[0];
+
+  for (const route of backendRoutes) {
+    if (
+      route.eta_minutes <
+      fastestRoute.eta_minutes
+    ) {
+      fastestRoute = route;
     }
   }
 
-  // Map candidate routes with explicit trade-offs and semantics
-  const mappedRoutes: RouteOption[] = backendRoutes.map((route, index) => {
-    const isRecommended = route.route_id === recommended_route_id;
-    const isFastest = route.route_id === fastestRoute.route_id;
+  const routes: RouteOption[] =
+    backendRoutes.map(
+      (route, index) => {
+        const isRecommended =
+          route.route_id ===
+          analysis.recommended_route_id;
 
-    let category: RouteCategory = "alternative";
-    if (isRecommended) {
-      category = "recommended";
-    } else if (route.safety_score < 0.55 || (route.risk_level && ["high", "severe"].includes(route.risk_level))) {
-      category = "higher_risk";
-    } else if (isFastest) {
-      category = "fastest";
-    }
+        const isFastest =
+          route.route_id ===
+          fastestRoute.route_id;
 
-    // Geometry conversion: GeoJSON [lon, lat] -> Leaflet [lat, lon]
-    let coordinates: LeafletCoordinate[] | undefined;
-    if (route.geojson?.coordinates && Array.isArray(route.geojson.coordinates)) {
-      coordinates = route.geojson.coordinates
-        .filter((pair) => Array.isArray(pair) && pair.length >= 2 && !isNaN(pair[0]) && !isNaN(pair[1]))
-        .map(([lon, lat]) => [lat, lon] as LeafletCoordinate);
-    }
+        let category:
+          RouteCategory =
+          "alternative";
 
-    const risks: RiskBreakdownScores = {
-      landslide: typeof route.landslide_risk === "number" && !isNaN(route.landslide_risk)
-        ? Math.round(route.landslide_risk * 100)
-        : null,
-      flood: typeof route.flood_risk === "number" && !isNaN(route.flood_risk)
-        ? Math.round(route.flood_risk * 100)
-        : null,
-      weather: typeof route.weather_risk === "number" && !isNaN(route.weather_risk)
-        ? Math.round(route.weather_risk * 100)
-        : null,
-      roadCondition: typeof route.road_quality_score === "number" && !isNaN(route.road_quality_score)
-        ? Math.round(Math.max(0, 100 - route.road_quality_score))
-        : null,
-    };
+        if (isRecommended) {
+          category =
+            "recommended";
+        } else if (
+          route.safety_score <
+            0.55 ||
+          (
+            route.risk_level &&
+            [
+              "high",
+              "severe",
+            ].includes(
+              route.risk_level,
+            )
+          )
+        ) {
+          category =
+            "higher_risk";
+        } else if (isFastest) {
+          category =
+            "fastest";
+        }
 
-    const overallRisk = typeof route.safety_score === "number" && !isNaN(route.safety_score)
-      ? Math.round((1 - route.safety_score) * 100)
-      : 0;
+        let coordinates:
+          LeafletCoordinate[] |
+          undefined;
 
-    const overallRiskScore = typeof route.safety_score === "number" && !isNaN(route.safety_score)
-      ? Math.round((1 - route.safety_score) * 100)
+        /*
+         * IMPORTANT:
+         *
+         * GeoJSON is [longitude, latitude].
+         * Leaflet expects [latitude, longitude].
+         *
+         * We use ONLY backend geometry here.
+         * No straight-line geometry is generated.
+         */
+        if (
+          route.geojson?.coordinates &&
+          Array.isArray(
+            route.geojson.coordinates,
+          )
+        ) {
+          coordinates =
+            route.geojson.coordinates
+              .filter(
+                (pair) =>
+                  Array.isArray(pair) &&
+                  pair.length >= 2 &&
+                  Number.isFinite(
+                    pair[0],
+                  ) &&
+                  Number.isFinite(
+                    pair[1],
+                  ),
+              )
+              .map(
+                ([longitude, latitude]) =>
+                  [
+                    latitude,
+                    longitude,
+                  ] as LeafletCoordinate,
+              );
+        }
+
+        const risks:
+          RiskBreakdownScores = {
+          landslide:
+            typeof route.landslide_risk ===
+              "number"
+              ? Math.round(
+                  route.landslide_risk *
+                    100,
+                )
+              : null,
+
+          flood:
+            typeof route.flood_risk ===
+              "number"
+              ? Math.round(
+                  route.flood_risk *
+                    100,
+                )
+              : null,
+
+          weather:
+            typeof route.weather_risk ===
+              "number"
+              ? Math.round(
+                  route.weather_risk *
+                    100,
+                )
+              : null,
+
+          roadCondition:
+            typeof route.road_quality_score ===
+              "number"
+              ? Math.round(
+                  Math.max(
+                    0,
+                    100 -
+                      route.road_quality_score,
+                  ),
+                )
+              : null,
+        };
+
+        const overallRisk =
+          typeof route.safety_score ===
+          "number"
+            ? Math.round(
+                (1 -
+                  route.safety_score) *
+                  100,
+              )
+            : 0;
+
+        const overallRiskScore =
+          typeof route.safety_score ===
+          "number"
+            ? Math.round(
+                (1 -
+                  route.safety_score) *
+                  100,
+              )
+            : null;
+
+        const addedMinutes =
+          Math.max(
+            0,
+            Math.round(
+              route.eta_minutes -
+                fastestRoute.eta_minutes,
+            ),
+          );
+
+        const addedKm =
+          Math.max(
+            0,
+            Math.round(
+              (
+                route.distance_km -
+                fastestRoute.distance_km
+              ) * 10,
+            ) / 10,
+          );
+
+        let hazardMarkers:
+          HazardMarker[] |
+          undefined;
+
+        if (
+          coordinates &&
+          coordinates.length >= 4
+        ) {
+          const markers:
+            HazardMarker[] = [];
+
+          if (
+            typeof route.landslide_risk ===
+              "number" &&
+            route.landslide_risk >=
+              0.6
+          ) {
+            const index =
+              Math.floor(
+                coordinates.length *
+                  0.45,
+              );
+
+            markers.push({
+              id: `${route.route_id}-landslide`,
+              coordinate:
+                coordinates[index],
+              type: "landslide",
+              severity:
+                route.landslide_risk >=
+                0.8
+                  ? "severe"
+                  : "high",
+              label:
+                "Landslide Risk Area",
+              description:
+                "Elevated modeled landslide exposure along this corridor.",
+            });
+          }
+
+          if (
+            typeof route.flood_risk ===
+              "number" &&
+            route.flood_risk >=
+              0.6
+          ) {
+            const index =
+              Math.floor(
+                coordinates.length *
+                  0.75,
+              );
+
+            markers.push({
+              id: `${route.route_id}-flood`,
+              coordinate:
+                coordinates[index],
+              type: "flood",
+              severity:
+                route.flood_risk >=
+                0.8
+                  ? "severe"
+                  : "high",
+              label:
+                "Flood Risk Area",
+              description:
+                "Elevated modeled flood exposure along this corridor.",
+            });
+          }
+
+          if (markers.length > 0) {
+            hazardMarkers =
+              markers;
+          }
+        }
+
+        const displayName =
+          isRecommended
+            ? `Route ${index + 1} (Recommended)`
+            : isFastest
+              ? `Route ${index + 1} (Fastest)`
+              : `Route ${index + 1}`;
+
+        return {
+          id: route.route_id,
+
+          name: displayName,
+
+          category,
+
+          status:
+            category ===
+            "higher_risk"
+              ? "higher_risk"
+              : isRecommended
+                ? "recommended"
+                : "alternate",
+
+          isRecommended,
+
+          isFastest,
+
+          distanceKm:
+            Math.round(
+              route.distance_km *
+                10,
+            ) / 10,
+
+          etaMinutes:
+            Math.round(
+              route.eta_minutes,
+            ),
+
+          addedMinutesComparedToFastest:
+            addedMinutes,
+
+          addedKmComparedToFastest:
+            addedKm,
+
+          overallRisk,
+
+          overallRiskScore,
+
+          overallRiskLevel:
+            (route.risk_level as HazardRiskLevel) ??
+            "unknown",
+
+          reliability:
+            Math.round(
+              route.reliability_percent ??
+                route.reliability_score *
+                  100,
+            ),
+
+          reason:
+            route.reason ||
+            route.recommendation_reasons?.[0]
+              ?.message ||
+            "Route evaluated by the backend.",
+
+          recommendationReasons:
+            route.recommendation_reasons ??
+            [],
+
+          risks,
+
+          hazards:
+            route.hazards,
+
+          hazardMarkers,
+
+          coordinates,
+
+          geojson:
+            route.geojson,
+
+          dataQuality:
+            route.data_quality,
+
+          modelMode:
+            route.model_mode,
+
+          riskLevel:
+            route.risk_level,
+
+          roadQualityScore:
+            route.road_quality_score,
+
+          vehicleSuitability:
+            route.vehicle_suitability,
+
+          policyNotes:
+            route.policy_notes ?? [],
+
+          scoreBreakdown:
+            route.score_breakdown,
+        };
+      },
+    );
+
+  const recommended =
+    routes.find(
+      (route) =>
+        route.isRecommended,
+    ) ?? routes[0];
+
+  const accessAvailable =
+    typeof backendRoutes[0]
+      ?.accessibility_score ===
+      "number";
+
+  const accessScore =
+    accessAvailable
+      ? Math.round(
+          backendRoutes[0]
+            .accessibility_score *
+            100,
+        )
       : null;
 
-    const overallRiskLevel = (route.risk_level as HazardRiskLevel) || "unknown";
+  const isFallback =
+    analysis.intelligence_mode ===
+      "go_fallback" ||
+    analysis.intelligence_mode ===
+      "routing_only";
 
-    const addedMinutes = Math.max(0, Math.round(route.eta_minutes - fastestRoute.eta_minutes));
-    const addedKm = Math.max(0, Math.round((route.distance_km - fastestRoute.distance_km) * 10) / 10);
+  let fallbackNotice:
+    | string
+    | undefined;
 
-    const displayName = isRecommended
-      ? `Route ${index + 1} (Recommended)`
-      : isFastest
-        ? `Route ${index + 1} (Fastest)`
-        : `Route ${index + 1}`;
-
-    // Extract or build spatial hazard markers along the corridor
-    let hazardMarkers: HazardMarker[] | undefined;
-    if (coordinates && coordinates.length >= 4) {
-      const markers: HazardMarker[] = [];
-      if (route.landslide_risk && route.landslide_risk >= 0.6) {
-        const midIdx = Math.floor(coordinates.length * 0.45);
-        markers.push({
-          id: `${route.route_id}-landslide`,
-          coordinate: coordinates[midIdx],
-          type: "landslide",
-          severity: route.landslide_risk >= 0.8 ? "severe" : "high",
-          label: "Steep Terrain Landslide Risk",
-          description: `Modeled landslide probability of ${Math.round(route.landslide_risk * 100)}% along hillside pass.`,
-        });
-      }
-      if (route.flood_risk && route.flood_risk >= 0.6) {
-        const floodIdx = Math.floor(coordinates.length * 0.75);
-        markers.push({
-          id: `${route.route_id}-flood`,
-          coordinate: coordinates[floodIdx],
-          type: "flood",
-          severity: route.flood_risk >= 0.8 ? "severe" : "high",
-          label: "Lowland Flood Risk Zone",
-          description: `River basin corridor subject to flash inundation (${Math.round(route.flood_risk * 100)}% risk index).`,
-        });
-      }
-      if (markers.length > 0) {
-        hazardMarkers = markers;
-      }
-    }
-
-    return {
-      id: route.route_id,
-      name: displayName,
-      category,
-      status: category === "higher_risk" ? "higher_risk" : isRecommended ? "recommended" : "alternate",
-      isRecommended,
-      isFastest,
-      distanceKm: Math.round(route.distance_km * 10) / 10,
-      etaMinutes: Math.round(route.eta_minutes),
-      addedMinutesComparedToFastest: addedMinutes,
-      addedKmComparedToFastest: addedKm,
-      overallRisk,
-      overallRiskScore,
-      overallRiskLevel,
-      reliability: Math.round(route.reliability_percent || route.reliability_score * 100 || 0),
-      reason: route.reason || (route.recommendation_reasons?.[0]?.message ?? "Evaluated highway corridor"),
-      recommendationReasons: route.recommendation_reasons || [],
-      risks,
-      hazards: route.hazards,
-      hazardMarkers,
-      coordinates,
-      geojson: route.geojson,
-      dataQuality: route.data_quality,
-      modelMode: route.model_mode,
-      vehicleSuitability: route.vehicle_suitability,
-      policyNotes: route.policy_notes || [],
-    };
-  });
-
-  const recommendedRoute = mappedRoutes.find((r) => r.isRecommended) || mappedRoutes[0];
-
-  // Truthful accessibility status - no zero coercion
-  const hasAccessibilityScore =
-    typeof backendRoutes[0]?.accessibility_score === "number" &&
-    !isNaN(backendRoutes[0].accessibility_score);
-  const rawAccessScore = hasAccessibilityScore
-    ? Math.round(backendRoutes[0].accessibility_score * 100)
-    : null;
-
-  const isFallback = analysis.intelligence_mode === "go_fallback" || analysis.intelligence_mode === "routing_only";
-
-  let fallbackNotice: string | undefined;
-  if (analysis.intelligence_mode === "go_fallback") {
-    fallbackNotice = "Python intelligence service unavailable; deterministic Go fallback scoring applied.";
-  } else if (analysis.intelligence_mode === "partial") {
-    fallbackNotice = "Operating with partial hazard coverage; check individual signal warnings.";
-  } else if (analysis.intelligence_mode === "demo") {
-    fallbackNotice = "Deterministic demonstration scenario (Guwahati → Shillong) using static offline geometry.";
+  if (
+    analysis.intelligence_mode ===
+    "go_fallback"
+  ) {
+    fallbackNotice =
+      "Python intelligence service unavailable; deterministic Go fallback scoring is being used.";
   }
 
-  const primaryExplanation =
-    analysis.recommendation_reasons?.[0]?.message ||
-    recommendedRoute.reason ||
-    "Risk-aware recommended corridor evaluated by multi-criteria trade-off scoring.";
+  if (
+    analysis.intelligence_mode ===
+    "partial"
+  ) {
+    fallbackNotice =
+      "Some hazard signals are unavailable. Review the route data-quality warnings.";
+  }
 
   return {
-    origin: originalRequest.origin,
-    destination: originalRequest.destination,
-    vehicle: originalRequest.vehicle,
-    cargo: originalRequest.cargo,
-    priority: originalRequest.priority,
-    generatedAt: analysis.generated_at || new Date().toISOString(),
-    recommendedRouteId: recommended_route_id,
-    fastestRouteId: fastestRoute.route_id,
-    explanation: primaryExplanation,
-    routes: mappedRoutes,
+    origin:
+      originalRequest.origin,
+
+    destination:
+      originalRequest.destination,
+
+    vehicle:
+      originalRequest.vehicle,
+
+    cargo:
+      originalRequest.cargo,
+
+    priority:
+      originalRequest.priority,
+
+    generatedAt:
+      analysis.generated_at,
+
+    recommendedRouteId:
+      analysis.recommended_route_id,
+
+    fastestRouteId:
+      fastestRoute.route_id,
+
+    explanation:
+      analysis
+        .recommendation_reasons?.[0]
+        ?.message ??
+      recommended.reason,
+
+    routes,
+
     accessibility: {
-      score: rawAccessScore,
-      roadAccessibility: rawAccessScore,
-      essentialServicesProximity: null,
-      terrainDifficulty: null,
-      status: hasAccessibilityScore ? "Available" : "Unavailable",
-      notes: hasAccessibilityScore
-        ? `Corridor road accessibility evaluated at ${rawAccessScore}/100. Essential services proximity and micro-terrain sensors are not modeled by current scoring engine.`
-        : "Road accessibility score not computed by current scoring model.",
+      score: accessScore,
+
+      roadAccessibility:
+        accessScore,
+
+      essentialServicesProximity:
+        null,
+
+      terrainDifficulty:
+        null,
+
+      status: accessAvailable
+        ? "Available"
+        : "Unavailable",
+
+      notes: accessAvailable
+        ? `Road accessibility evaluated at ${accessScore}/100.`
+        : "Road accessibility was not computed.",
     },
-    requestId: analysis.request_id,
-    schemaVersion: analysis.schema_version,
-    intelligenceMode: analysis.intelligence_mode,
-    recommendationReasons: analysis.recommendation_reasons || [],
-    warnings: analysis.warnings || [],
-    scoringVersion: analysis.scoring_version,
+
+    requestId:
+      analysis.request_id,
+
+    schemaVersion:
+      analysis.schema_version,
+
+    intelligenceMode:
+      analysis.intelligence_mode,
+
+    recommendationReasons:
+      analysis.recommendation_reasons ??
+      [],
+
+    warnings:
+      analysis.warnings ?? [],
+
+    scoringVersion:
+      analysis.scoring_version,
+
     isFallback,
+
     fallbackNotice,
   };
 }
 
-/**
- * Reconstructs a clean UI RouteResponse from an immutable saved assessment snapshot.
- */
-export function transformBookmarkToRouteResponse(bookmark: Bookmark): RouteResponse {
+/* -------------------------------------------------------------------------- */
+/* Bookmark -> UI                                                             */
+/* -------------------------------------------------------------------------- */
+
+export function transformBookmarkToRouteResponse(
+  bookmark: Bookmark,
+): RouteResponse {
   if (!bookmark.snapshot) {
-    throw new ContractValidationError("Bookmark does not contain an assessment route snapshot");
+    throw new ContractValidationError(
+      "Bookmark does not contain a route snapshot.",
+    );
   }
 
-  const raw: BackendAnalyzeResponse = {
+  const rawResponse:
+    BackendAnalyzeResponse = {
     schema_version: "3.1.0",
-    request_id: bookmark.assessment_id || bookmark.bookmark_id,
-    recommended_route_id: bookmark.snapshot.route_id,
-    intelligence_mode: bookmark.snapshot.model_mode === "ml" ? "live_ml" : "live_heuristic",
-    routes: [bookmark.snapshot],
-    recommendation_reasons: bookmark.snapshot.recommendation_reasons || [],
+
+    request_id:
+      bookmark.assessment_id ??
+      bookmark.bookmark_id,
+
+    recommended_route_id:
+      bookmark.snapshot.route_id,
+
+    intelligence_mode:
+      bookmark.snapshot.model_mode ===
+      "ml"
+        ? "live_ml"
+        : "live_heuristic",
+
+    routes: [
+      bookmark.snapshot,
+    ],
+
+    recommendation_reasons:
+      bookmark.snapshot
+        .recommendation_reasons ??
+      [],
+
     warnings: [],
+
     persisted: true,
-    generated_at: bookmark.assessed_at || bookmark.saved_at,
-    scoring_version: bookmark.scoring_version || "v2.4.0",
+
+    generated_at:
+      bookmark.assessed_at ||
+      bookmark.saved_at,
+
+    scoring_version:
+      bookmark.scoring_version ||
+      "unknown",
   };
 
-  const req: RouteRequest = {
-    origin: bookmark.origin_summary || bookmark.request?.origin || "Origin",
-    destination: bookmark.destination_summary || bookmark.request?.destination || "Destination",
-    vehicle: (bookmark.request?.vehicle as VehicleType) || (bookmark.route_type as VehicleType) || "Truck",
-    cargo: (bookmark.request?.cargo as CargoType) || "Medical Supplies",
-    priority: (bookmark.request?.priority as PriorityLevel) || "Emergency",
+  const request:
+    RouteRequest = {
+    origin:
+      bookmark.origin_summary,
+
+    destination:
+      bookmark.destination_summary,
+
+    vehicle:
+      (bookmark.request?.vehicle as VehicleType) ??
+      "Truck",
+
+    cargo:
+      (bookmark.request?.cargo as CargoType) ??
+      "General Cargo",
+
+    priority:
+      (bookmark.request?.priority as PriorityLevel) ??
+      "Standard",
   };
 
-  return transformToRouteResponse(raw, req);
+  return transformToRouteResponse(
+    rawResponse,
+    request,
+  );
 }
-
